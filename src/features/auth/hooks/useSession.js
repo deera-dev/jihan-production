@@ -7,16 +7,31 @@ import { useEffect } from 'react'
 import { useAuthStore } from '../../../store/useAuthStore'
 import { ambilProfil, ambilSesiSaatIni, dengarkanPerubahanSesi } from '../api/authRepository'
 
+// Jika Supabase tidak merespons dalam 8 detik (project paused, network issue,
+// atau token refresh hang), paksa clearSession agar UI tidak stuck "MEMUAT...".
+const TIMEOUT_SESI_MS = 8_000
+
 export function useSession() {
   const { user, profile, isLoading, setSession, clearSession, setLoading } = useAuthStore()
 
   useEffect(() => {
     let aktif = true
+    let timeoutId = null
 
     async function muatSesiAwal() {
       setLoading(true)
+
+      // Safety-net: jika sesi tidak selesai dalam TIMEOUT_SESI_MS, clear saja.
+      timeoutId = setTimeout(() => {
+        if (aktif) {
+          console.warn('[useSession] timeout memuat sesi — Supabase tidak merespons?')
+          clearSession()
+        }
+      }, TIMEOUT_SESI_MS)
+
       try {
         const session = await ambilSesiSaatIni()
+        clearTimeout(timeoutId)
         if (!aktif) return
         if (session?.user) {
           const profil = await ambilProfil(session.user.id)
@@ -25,6 +40,7 @@ export function useSession() {
           if (aktif) clearSession()
         }
       } catch (err) {
+        clearTimeout(timeoutId)
         console.error('[useSession] gagal memuat sesi:', err)
         if (aktif) clearSession()
       }
@@ -49,6 +65,7 @@ export function useSession() {
 
     return () => {
       aktif = false
+      clearTimeout(timeoutId)
       berhentiMendengar()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
