@@ -1,0 +1,3 @@
+Komponen UI khusus fitur `pengiriman` (tidak dipakai fitur lain) tinggal di sini.
+Komponen yang dipakai ≥3 slice harus dipindah ke src/components/shared/
+(lihat architecture.md § Prinsip Arsitektur Kode — Shared Kernel).

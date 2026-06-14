@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  h1, h2, h3 {
+    @apply font-heading;
+  }
+
+  /* Angka Rupiah selalu pakai tabular-nums agar rapi sejajar (design-system.md §3) */
+  .text-price {
+    font-feature-settings: 'tnum' 1, 'lnum' 1;
+  }
+}

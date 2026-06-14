@@ -1,0 +1,6 @@
+export { PengaturanPage } from './PengaturanPage'
+export { KelolaPenggunaPage } from './KelolaPenggunaPage'
+export { ActivityLogPage } from './ActivityLogPage'
+export { DataTerhapusPage } from './DataTerhapusPage'
+export { GantiPasswordPage } from './GantiPasswordPage'
+export { TemplateHPPPage } from './TemplateHPPPage'

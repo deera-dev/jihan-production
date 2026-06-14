@@ -1,0 +1,256 @@
+// Script sementara — generate skeleton 11 slice fitur sisanya.
+// Dijalankan sekali via `node`, lalu file ini dihapus.
+import { mkdirSync, writeFileSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
+
+const ROOT = process.argv[2]
+if (!ROOT) throw new Error('usage: node scaffold.mjs <root-features-dir>')
+
+/**
+ * @typedef {Object} SliceConfig
+ * @property {string} slice        folder name, e.g. 'produksi'
+ * @property {string} nama         PascalCase nama fitur, e.g. 'Produksi'
+ * @property {string} ringkasan    deskripsi singkat (komentar header)
+ * @property {string[]} pages      nama Page component(s), e.g. ['ProduksiListPage','ProduksiDetailPage']
+ * @property {string} sumberTabel  nama tabel utama di DB (utk komentar repository)
+ */
+
+/** @type {SliceConfig[]} */
+const SLICES = [
+  {
+    slice: 'produksi',
+    nama: 'Produksi',
+    ringkasan: 'Buat & kelola produksi (batch), surat jalan, dan bahan dari Jihan.',
+    pages: ['ProduksiListPage', 'ProduksiDetailPage'],
+    sumberTabel: 'produksi',
+  },
+  {
+    slice: 'kode',
+    nama: 'Kode',
+    ringkasan: 'Detail satu kode produk (J-001-IMA): ukuran, warna, status flow.',
+    pages: ['KodeDetailPage'],
+    sumberTabel: 'kode',
+  },
+  {
+    slice: 'sampel',
+    nama: 'Sampel',
+    ringkasan:
+      'Upload sampel (2 foto), review & approve/tolak oleh Jihan, histori (termasuk yang ditolak — tidak pernah dihapus).',
+    pages: [],
+    sumberTabel: 'sampel',
+  },
+  {
+    slice: 'hpp',
+    nama: 'Hpp',
+    ringkasan:
+      'Input & kalkulasi HPP (Jasa + Bahan Primer/Sekunder + Bahan Baku), review/approve Jihan, histori revisi.',
+    pages: ['HPPKalkulatorPage'],
+    sumberTabel: 'hpp',
+  },
+  {
+    slice: 'buku-potong',
+    nama: 'BukuPotong',
+    ringkasan:
+      'Input data aktual hasil potong: yard primer terpakai per warna, jumlah pcs per ukuran/warna.',
+    pages: [],
+    sumberTabel: 'kode_ukuran_warna',
+  },
+  {
+    slice: 'nota',
+    nama: 'Nota',
+    ringkasan:
+      'Nota pembelian bahan baku (1 atau lintas kode) & katalog bahan baku. Dasar perhitungan komponen Bahan Baku di HPP.',
+    pages: ['NotaListPage'],
+    sumberTabel: 'nota_pembelian',
+  },
+  {
+    slice: 'tracking',
+    nama: 'Tracking',
+    ringkasan:
+      'Update progres produksi per tahap (dipotong/dijahit/finishing/siapKirim), per ukuran, per warna; catat reject & nasibnya.',
+    pages: [],
+    sumberTabel: 'tracking_produksi',
+  },
+  {
+    slice: 'pengiriman',
+    nama: 'Pengiriman',
+    ringkasan:
+      'Kelola pengiriman (bisa bertahap/parsial per warna atau per jumlah pcs), perlu approval Jihan.',
+    pages: [],
+    sumberTabel: 'pengiriman',
+  },
+  {
+    slice: 'kasbon',
+    nama: 'Kasbon',
+    ringkasan:
+      'Ledger Kasbon: input dana masuk (Deera), histori gabungan masuk + potongan_otomatis dgn saldo berjalan (saldo GLOBAL lintas produksi).',
+    pages: ['KasbonPage'],
+    sumberTabel: 'kasbon',
+  },
+  {
+    slice: 'notifikasi',
+    nama: 'Notifikasi',
+    ringkasan: 'Daftar notifikasi & pengaturan mode (real-time / digest harian).',
+    pages: ['NotifikasiPage'],
+    sumberTabel: 'notifications',
+  },
+  {
+    slice: 'dashboard',
+    nama: 'Dashboard',
+    ringkasan: 'Ringkasan utama — tampilan berbeda per role (Deera vs Jihan), satu slice.',
+    pages: ['DashboardPage'],
+    sumberTabel: null,
+  },
+]
+
+function ensureDir(p) {
+  if (!existsSync(p)) mkdirSync(p, { recursive: true })
+}
+
+function camelFirst(s) {
+  return s.charAt(0).toLowerCase() + s.slice(1)
+}
+
+for (const cfg of SLICES) {
+  const dir = join(ROOT, cfg.slice)
+  ensureDir(dir)
+  ensureDir(join(dir, 'components'))
+  ensureDir(join(dir, 'hooks'))
+  ensureDir(join(dir, 'api'))
+
+  const namaCamel = camelFirst(cfg.nama)
+  const repoFile = `${namaCamel}Repository.js`
+  const hookFile = `use${cfg.nama}.js`
+
+  // ── api/<nama>Repository.js ────────────────────────────────────────────
+  const repoPath = join(dir, 'api', repoFile)
+  if (!existsSync(repoPath)) {
+    writeFileSync(
+      repoPath,
+      `// Satu-satunya tempat fitur \`${cfg.slice}\` boleh memanggil Supabase langsung
+// (lihat architecture.md § Prinsip Arsitektur Kode — batas Dependency Inversion).
+// hooks/ & komponen TIDAK BOLEH import `+ "`supabase`" + ` secara langsung — selalu lewat fungsi di sini.
+//
+// ${cfg.ringkasan}
+${cfg.sumberTabel ? `// Tabel utama: \`public.${cfg.sumberTabel}\` (lihat architecture.md § Skema Database)\n` : ''}
+import { supabase } from '../../../lib/supabase'
+
+// TODO: implementasikan fungsi CRUD/query sesuai kebutuhan UI fitur ini.
+// Pola umum:
+//
+// export async function ambilSemua${cfg.nama}() {
+//   const { data, error } = await supabase.from('${cfg.sumberTabel ?? 'TODO_nama_tabel'}').select('*')
+//   if (error) throw error
+//   return data
+// }
+
+export {}
+`
+    )
+  }
+
+  // ── hooks/use<Nama>.js ─────────────────────────────────────────────────
+  const hookPath = join(dir, 'hooks', hookFile)
+  if (!existsSync(hookPath)) {
+    writeFileSync(
+      hookPath,
+      `// Boundary antara UI & data layer fitur \`${cfg.slice}\`.
+// Komponen panggil hook ini — TIDAK PERNAH import repository/Supabase langsung
+// (Dependency Inversion: Component → hook → repository → Supabase).
+
+import { useQuery } from '@tanstack/react-query'
+// import { ambilSemua${cfg.nama} } from '../api/${repoFile.replace(/\\.js$/, '')}'
+
+/**
+ * TODO: ganti queryFn & queryKey sesuai data yang dibutuhkan UI.
+ * @returns {{ data: any, isLoading: boolean, error: Error | null }}
+ */
+export function use${cfg.nama}() {
+  return useQuery({
+    queryKey: ['${cfg.slice}'],
+    queryFn: async () => {
+      throw new Error('TODO: implementasikan use${cfg.nama} — hubungkan ke ${repoFile}')
+    },
+    enabled: false, // nonaktif sampai diimplementasikan — cegah error saat dev
+  })
+}
+`
+    )
+  }
+
+  // ── components/.gitkeep ────────────────────────────────────────────────
+  const gitkeepPath = join(dir, 'components', '.gitkeep')
+  if (!existsSync(gitkeepPath)) {
+    writeFileSync(
+      gitkeepPath,
+      `Komponen UI khusus fitur \`${cfg.slice}\` (tidak dipakai fitur lain) tinggal di sini.
+Komponen yang dipakai ≥3 slice harus dipindah ke src/components/shared/
+(lihat architecture.md § Prinsip Arsitektur Kode — Shared Kernel).
+`
+    )
+  }
+
+  // ── schema.js ──────────────────────────────────────────────────────────
+  const schemaPath = join(dir, 'schema.js')
+  if (!existsSync(schemaPath)) {
+    writeFileSync(
+      schemaPath,
+      `// Zod schema validasi input fitur \`${cfg.slice}\`.
+// Dipakai bersama react-hook-form (resolver) di komponen form.
+// Sumber aturan: CLAUDE.md § Aturan Bisnis Kritis & § Aturan Input (Global)
+// (ingat: text biasa selalu UPPERCASE, number pakai slider+input manual).
+
+import { z } from 'zod'
+
+// TODO: definisikan schema sesuai form fitur ini, contoh:
+// export const ${camelFirst(cfg.nama)}Schema = z.object({
+//   nama: z.string().min(1, 'Wajib diisi'),
+// })
+
+export {}
+`
+    )
+  }
+
+  // ── Page(s) ────────────────────────────────────────────────────────────
+  for (const pageName of cfg.pages) {
+    const pagePath = join(dir, `${pageName}.jsx`)
+    if (!existsSync(pagePath)) {
+      writeFileSync(
+        pagePath,
+        `// Route-level component fitur \`${cfg.slice}\`.
+// ${cfg.ringkasan}
+// TODO: lengkapi UI sesuai wireframe.md & design-system.md (mobile-first 390px,
+// navy/charcoal + aksen gold/champagne, teks sebagai label utama — minim icon).
+
+export function ${pageName}() {
+  return (
+    <main className="min-h-screen bg-champagne-100 px-4 py-6">
+      <h1 className="font-heading text-heading text-navy-900">${pageName.replace(/Page$/, '').toUpperCase()}</h1>
+      <p className="mt-2 font-sans text-body text-charcoal-600">
+        TODO: implementasikan halaman ini sesuai wireframe.md.
+      </p>
+    </main>
+  )
+}
+`
+      )
+    }
+  }
+
+  // ── index.js (barrel — public surface slice) ──────────────────────────
+  const indexPath = join(dir, 'index.js')
+  if (!existsSync(indexPath)) {
+    const pageExports = cfg.pages.map((p) => `export { ${p} } from './${p}'`).join('\n')
+    writeFileSync(
+      indexPath,
+      `// Public surface fitur \`${cfg.slice}\` — slice lain HANYA boleh import dari sini,
+// tidak boleh menjangkau langsung ke dalam internal (components/, api/, hooks/).
+${pageExports ? '\n' + pageExports + '\n' : '\n// TODO: export Page/hook/komponen yang perlu diakses slice lain.\n'}
+export { use${cfg.nama} } from './hooks/${hookFile.replace(/\\.js$/, '')}'
+`
+    )
+  }
+}
+
+console.log('Scaffold selesai untuk', SLICES.length, 'slice.')
