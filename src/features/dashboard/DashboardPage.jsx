@@ -41,7 +41,7 @@ export function DashboardPage() {
   const jumlahProduksiAktif = new Set(kodeAktif.map((k) => k.produksi.id)).size
 
   return (
-    <div className="min-h-screen bg-champagne-100">
+    <div className="bg-champagne-100">
       <div className="bg-navy-900 px-4 pt-8 pb-6">
         <p className="font-sans text-label text-champagne-100 opacity-60">Halo,</p>
         <h1 className="font-heading text-2xl text-champagne-100">{nama}</h1>

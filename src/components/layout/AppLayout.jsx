@@ -45,35 +45,7 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-champagne-100">
-      {isMaster && (
-        <div className="fixed right-4 top-4 z-50 flex items-center gap-1 rounded-full border border-gold-500 bg-surface px-3 py-1 shadow-md">
-          <span className="mr-1 font-sans text-xs font-semibold text-charcoal-600">LIHAT:</span>
-          <button
-            onClick={() => setViewAsRole('deera')}
-            className={[
-              'rounded-full px-2 py-0.5 font-sans text-xs font-bold transition-colors',
-              viewAsRole === 'deera'
-                ? 'bg-navy-900 text-champagne-100'
-                : 'text-charcoal-600 hover:bg-champagne-200',
-            ].join(' ')}
-          >
-            DEERA
-          </button>
-          <button
-            onClick={() => setViewAsRole('jihan')}
-            className={[
-              'rounded-full px-2 py-0.5 font-sans text-xs font-bold transition-colors',
-              viewAsRole === 'jihan'
-                ? 'bg-navy-900 text-champagne-100'
-                : 'text-charcoal-600 hover:bg-champagne-200',
-            ].join(' ')}
-          >
-            JIHAN
-          </button>
-        </div>
-      )}
-
-      <main className={['flex-1 pb-16', isMaster ? 'pt-12' : ''].join(' ')}>
+      <main className="flex-1 pb-16">
         <Outlet />
       </main>
 
@@ -110,6 +82,19 @@ export function AppLayout() {
           )
         })}
       </nav>
+
+      {/* Toggle Master: tombol bulat kompak, floating di atas nav kanan bawah */}
+      {isMaster && (
+        <button
+          onClick={() => setViewAsRole(viewAsRole === 'deera' ? 'jihan' : 'deera')}
+          className="fixed bottom-16 right-4 z-50 h-10 w-10 rounded-full bg-navy-900 shadow-lg border-2 border-gold-500 flex items-center justify-center"
+          title={`Lihat sebagai: ${viewAsRole === 'deera' ? 'Deera' : 'Jihan'}`}
+        >
+          <span className="font-sans text-xs font-bold text-champagne-100">
+            {viewAsRole === 'deera' ? 'D' : 'J'}
+          </span>
+        </button>
+      )}
     </div>
   )
 }
@@ -132,14 +117,14 @@ function MasterRolePicker({ onSelect }) {
           className="w-full rounded-2xl border-2 border-navy-900 bg-navy-900 py-4 font-sans text-label font-bold tracking-wider text-champagne-100 transition-opacity active:opacity-80"
         >
           DEERA
-          <span className="ml-2 font-normal normal-case tracking-normal opacity-70">— Produsen (Full CRUD)</span>
+          <span className="ml-2 font-normal normal-case tracking-normal opacity-70">&#8212; Produsen (Full CRUD)</span>
         </button>
         <button
           onClick={() => onSelect('jihan')}
           className="w-full rounded-2xl border-2 border-navy-900 py-4 font-sans text-label font-bold tracking-wider text-navy-900 transition-opacity active:opacity-80"
         >
           JIHAN
-          <span className="ml-2 font-normal normal-case tracking-normal opacity-70">— Klien (Read-only + Approve)</span>
+          <span className="ml-2 font-normal normal-case tracking-normal opacity-70">&#8212; Klien (Read-only + Approve)</span>
         </button>
       </div>
     </div>

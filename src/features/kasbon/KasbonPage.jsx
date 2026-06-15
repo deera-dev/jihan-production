@@ -38,7 +38,7 @@ export function KasbonPage() {
   const ledgerDesc = [...ledger].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 
   return (
-    <div className="min-h-screen bg-champagne-100">
+    <div className="bg-champagne-100">
       <div className="bg-navy-900 px-4 py-5">
         <h1 className="font-heading text-heading text-champagne-100">KASBON</h1>
         <p className="font-sans text-xs text-champagne-100 opacity-50 mt-0.5">SALDO BERJALAN</p>
@@ -86,7 +86,7 @@ export function KasbonPage() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/60">
+        <div className="fixed inset-0 z-[60] flex items-end bg-black/60">
           <form onSubmit={handleSubmit} className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
             <p className="font-heading text-heading text-navy-900">CATAT DANA MASUK</p>
             <p className="font-sans text-label text-charcoal-600 -mt-2">

@@ -1,7 +1,8 @@
 // S-07 Detail Produksi — ringkasan bahan, surat jalan, dan daftar kode di produksi ini.
 
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useDetailProduksi } from './hooks/useProduksi'
+import { useDetailProduksi, useUpdateProduksi, useHapusProduksi } from './hooks/useProduksi'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { ProduksiBar } from '../../components/shared/ProduksiBar'
 import { useAuthStore, selectIsDeera } from '../../store/useAuthStore'
@@ -13,6 +14,30 @@ export function ProduksiDetailPage() {
   const navigate = useNavigate()
   const isDeera = useAuthStore(selectIsDeera)
   const { data: produksi, isLoading, error } = useDetailProduksi(produksiId)
+  const updateMut = useUpdateProduksi()
+  const hapusMut = useHapusProduksi()
+
+  const [modalEdit, setModalEdit] = useState(false)
+  const [modalHapus, setModalHapus] = useState(false)
+  const [editForm, setEditForm] = useState({ kode_bahan: '', catatan: '' })
+
+  function bukaEdit() {
+    setEditForm({ kode_bahan: produksi?.kode_bahan ?? '', catatan: produksi?.catatan ?? '' })
+    setModalEdit(true)
+  }
+
+  async function simpanEdit() {
+    await updateMut.mutateAsync({ id: produksiId, perubahan: {
+      kode_bahan: editForm.kode_bahan.toUpperCase(),
+      catatan: editForm.catatan || null,
+    }})
+    setModalEdit(false)
+  }
+
+  async function konfirmasiHapus() {
+    await hapusMut.mutateAsync(produksiId)
+    navigate('/produksi', { replace: true })
+  }
 
   if (isLoading) {
     return (
@@ -39,21 +64,29 @@ export function ProduksiDetailPage() {
   const suratJalan = produksi.surat_jalan ?? []
 
   return (
-    <div className="min-h-screen bg-champagne-100">
+    <div className="bg-champagne-100">
       {/* Header */}
       <div className="flex items-center gap-3 bg-navy-900 px-4 py-5">
-        <button onClick={() => navigate(-1)} className="font-sans text-body text-champagne-100">{'<'}</button>
+        <button onClick={() => navigate(-1)} className="font-sans text-body text-champagne-100">&#8592;</button>
         <div className="flex-1">
           <h1 className="font-heading text-heading text-champagne-100">BATCH {produksi.kode_bahan}</h1>
           <p className="font-sans text-xs text-champagne-200">{formatTanggal(produksi.tanggal)}</p>
         </div>
         {isDeera && (
-          <button
-            onClick={() => navigate(`/kode/baru?produksiId=${produksiId}`)}
-            className="rounded-lg bg-gold-500 px-3 py-1.5 font-sans text-xs font-semibold text-navy-900"
-          >
-            + KODE
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={bukaEdit}
+              className="rounded-lg border border-champagne-100/40 px-3 py-1.5 font-sans text-xs font-semibold text-champagne-100"
+            >
+              EDIT
+            </button>
+            <button
+              onClick={() => navigate(`/kode/baru?produksiId=${produksiId}`)}
+              className="rounded-lg bg-gold-500 px-3 py-1.5 font-sans text-xs font-semibold text-navy-900"
+            >
+              + KODE
+            </button>
+          </div>
         )}
       </div>
 
@@ -151,7 +184,77 @@ export function ProduksiDetailPage() {
             </div>
           </section>
         )}
+
+        {/* Tombol hapus — paling bawah, hanya Deera */}
+        {isDeera && (
+          <button
+            onClick={() => setModalHapus(true)}
+            className="w-full rounded-xl border border-danger py-3 font-sans text-label font-semibold text-danger"
+          >
+            HAPUS PRODUKSI
+          </button>
+        )}
       </div>
+
+      {/* Modal Edit */}
+      {modalEdit && (
+        <div className="fixed inset-0 z-[60] flex items-end bg-black/60">
+          <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
+            <p className="font-heading text-heading text-navy-900">EDIT PRODUKSI</p>
+            <div className="space-y-1">
+              <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Kode Bahan</label>
+              <input
+                type="text"
+                maxLength={10}
+                value={editForm.kode_bahan}
+                onChange={(e) => setEditForm((p) => ({ ...p, kode_bahan: e.target.value.toUpperCase() }))}
+                className="w-full rounded-xl border border-border px-4 py-3 font-sans text-body text-navy-900 uppercase outline-none focus:border-gold-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Catatan (opsional)</label>
+              <textarea
+                rows={3}
+                value={editForm.catatan}
+                onChange={(e) => setEditForm((p) => ({ ...p, catatan: e.target.value.toUpperCase() }))}
+                className="w-full rounded-xl border border-border px-4 py-3 font-sans text-body text-navy-900 uppercase outline-none focus:border-gold-500 resize-none"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setModalEdit(false)}
+                className="flex-1 rounded-xl border border-border py-3.5 font-sans text-body font-semibold text-charcoal-600">
+                BATAL
+              </button>
+              <button onClick={simpanEdit} disabled={updateMut.isPending}
+                className="flex-1 rounded-xl bg-gold-500 py-3.5 font-sans text-body font-semibold text-navy-900 disabled:opacity-50">
+                {updateMut.isPending ? 'MENYIMPAN...' : 'SIMPAN'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Hapus */}
+      {modalHapus && (
+        <div className="fixed inset-0 z-[60] flex items-end bg-black/60">
+          <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
+            <p className="font-heading text-heading text-navy-900">HAPUS PRODUKSI</p>
+            <p className="font-sans text-body text-charcoal-600">
+              Hapus produksi <span className="font-semibold text-navy-900">Batch {produksi.kode_bahan}</span>? Semua kode di dalamnya akan ikut terhapus (soft delete).
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setModalHapus(false)}
+                className="flex-1 rounded-xl border border-border py-3.5 font-sans text-body font-semibold text-charcoal-600">
+                BATAL
+              </button>
+              <button onClick={konfirmasiHapus} disabled={hapusMut.isPending}
+                className="flex-1 rounded-xl bg-danger py-3.5 font-sans text-body font-semibold text-white disabled:opacity-50">
+                {hapusMut.isPending ? 'MENGHAPUS...' : 'HAPUS'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

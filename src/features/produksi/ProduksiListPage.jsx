@@ -32,7 +32,7 @@ export function ProduksiListPage() {
   })
 
   return (
-    <div className="min-h-screen bg-champagne-100">
+    <div className="bg-champagne-100">
       <div className="flex items-center justify-between bg-navy-900 px-4 py-5">
         <h1 className="font-heading text-heading text-champagne-100">PRODUKSI</h1>
         {isDeera && (

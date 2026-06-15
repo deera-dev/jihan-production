@@ -24,7 +24,7 @@ export function PengaturanPage() {
   }
 
   return (
-    <div className="min-h-screen bg-champagne-100">
+    <div className="bg-champagne-100">
       <div className="bg-navy-900 px-4 py-5">
         <h1 className="font-heading text-heading text-champagne-100">PENGATURAN</h1>
       </div>

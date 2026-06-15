@@ -82,7 +82,7 @@ export function TemplateHPPPage() {
   }
 
   return (
-    <div className="min-h-screen bg-champagne-100">
+    <div className="bg-champagne-100">
       <div className="bg-navy-900 px-4 py-5">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/pengaturan')} className="font-sans text-sm text-champagne-100 opacity-70">&#8592; KEMBALI</button>
@@ -125,7 +125,7 @@ export function TemplateHPPPage() {
 
       {/* Bottom sheet form */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/60">
+        <div className="fixed inset-0 z-[60] flex items-end bg-black/60">
           <form onSubmit={handleSubmit} className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
             <p className="font-heading text-heading text-navy-900">
               {editItem ? 'EDIT KOMPONEN' : 'TAMBAH KOMPONEN'}
@@ -169,7 +169,7 @@ export function TemplateHPPPage() {
 
       {/* Konfirmasi hapus */}
       {konfirmHapus && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/60">
+        <div className="fixed inset-0 z-[60] flex items-end bg-black/60">
           <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
             <p className="font-heading text-heading text-navy-900">HAPUS KOMPONEN</p>
             <p className="font-sans text-body text-charcoal-600">

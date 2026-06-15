@@ -44,7 +44,7 @@ export function NotifikasiPage() {
   }
 
   return (
-    <div className="min-h-screen bg-champagne-100">
+    <div className="bg-champagne-100">
       <div className="bg-navy-900 px-4 py-5">
         <div className="flex items-center justify-between">
           <div>

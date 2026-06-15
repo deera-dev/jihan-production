@@ -5,7 +5,7 @@
 
 import { Routes, Route, Navigate } from 'react-router-dom'
 
-import { LoginPage, InvitePage, ProtectedRoute } from './features/auth'
+import { LoginPage, InvitePage, ProtectedRoute, useSession } from './features/auth'
 import { AppLayout } from './components/layout/AppLayout'
 
 import { DashboardPage } from './features/dashboard'
@@ -20,13 +20,17 @@ import { PengaturanPage, KelolaPenggunaPage, ActivityLogPage, DataTerhapusPage, 
 import { ROLE } from './constants/enums'
 
 export function App() {
+  // Inisialisasi sesi SEKALI di root — ProtectedRoute hanya baca dari store,
+  // tidak memanggil useSession() lagi (mencegah loop isLoading).
+  useSession()
+
   return (
     <Routes>
-      {/* ── Publik ────────────────────────────────────────────────── */}
+      {/* Publik */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/undangan" element={<InvitePage />} />
 
-      {/* ── Authenticated: dengan AppLayout (bottom nav) ─────────── */}
+      {/* Authenticated: dengan AppLayout (bottom nav) */}
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
 
@@ -39,10 +43,9 @@ export function App() {
           <Route path="/produksi/:produksiId" element={<ProduksiDetailPage />} />
           <Route path="/kode/:kodeId" element={<KodeDetailPage />} />
 
-          {/* Pengaturan — konten berbeda per role (di dalam komponen) */}
+          {/* Pengaturan */}
           <Route path="/pengaturan" element={<PengaturanPage />} />
           <Route path="/ganti-password" element={<GantiPasswordPage />} />
-          {/* Jihan: preferensi notifikasi dari menu pengaturan → re-use NotifikasiPage */}
           <Route path="/pengaturan/notifikasi" element={<NotifikasiPage />} />
 
           {/* Khusus Deera */}
@@ -60,7 +63,7 @@ export function App() {
         </Route>
       </Route>
 
-      {/* ── Fallback ──────────────────────────────────────────────── */}
+      {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

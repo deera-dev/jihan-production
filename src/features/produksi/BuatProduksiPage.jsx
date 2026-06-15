@@ -143,7 +143,7 @@ export function BuatProduksiPage() {
   const isProsesing = loadingProduksi || isSubmitting
 
   return (
-    <div className="min-h-screen bg-champagne-100">
+    <div className="bg-champagne-100">
       <div className="flex items-center gap-3 bg-navy-900 px-4 py-5">
         <button onClick={() => navigate(-1)} className="font-sans text-body text-champagne-100">&#8592;</button>
         <h1 className="font-heading text-heading text-champagne-100">BUAT PRODUKSI</h1>

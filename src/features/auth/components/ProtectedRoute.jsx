@@ -1,9 +1,9 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { useSession } from '../hooks/useSession'
+import { useAuthStore } from '../../../store/useAuthStore'
 import { ROLE } from '../../../constants/enums'
 
 export function ProtectedRoute({ allowedRoles }) {
-  const { profile, isLoading } = useSession()
+  const { profile, isLoading } = useAuthStore()
   const location = useLocation()
 
   if (isLoading) {
