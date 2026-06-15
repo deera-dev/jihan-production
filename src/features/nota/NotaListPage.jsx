@@ -369,7 +369,9 @@ function NotaCard({ nota, isDeera, isMaster, onEdit, onHapus }) {
   const [buka, setBuka] = useState(false);
   const [konfirmHapus, setKonfirmHapus] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [sharingInvoice, setSharingInvoice] = useState(false);
   const shareRef = useRef(null);
+  const invoiceRef = useRef(null);
   const bp = nota.biaya_produksi || {};
   const totalBP = totalBiayaProduksi(bp);
   const totalAksesoris = (nota.aksesoris || []).reduce(
@@ -456,10 +458,60 @@ function NotaCard({ nota, isDeera, isMaster, onEdit, onHapus }) {
     }
   }
 
+  // Invoice per-kode: pcs × jasa
+  const invoiceRows = useMemo(() => {
+    return (nota.nota_kode ?? []).map((nk) => {
+      const pcs = (nk.kode?.kode_ukuran ?? []).reduce(
+        (s, uk) =>
+          s +
+          (uk.kode_ukuran_warna ?? []).reduce(
+            (s2, w) => s2 + (w.jumlah_pcs || 0),
+            0,
+          ),
+        0,
+      );
+      return { kode: nk.kode?.kode_desain ?? "—", pcs };
+    });
+  }, [nota]);
+
   const semuaBahan = nota.produksi?.produksi_bahan ?? [];
   const totalNilaiBahan = totalAksesoris + (nilaiBahan || 0);
   const totalJasa = totalBP + (nota.biaya_jual_beli || 20000);
   const grandTotal = totalNilaiBahan + totalJasa;
+  const totalTagihanJasa = totalJasa * totalPcsNota;
+
+  async function handleShareInvoice() {
+    if (!invoiceRef.current || sharingInvoice) return;
+    setSharingInvoice(true);
+    try {
+      const canvas = await html2canvas(invoiceRef.current, {
+        backgroundColor: "#F8F3EA",
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+      });
+      canvas.toBlob(async (blob) => {
+        const namaFileInv = `invoice-deera-${kodeList.join("-")}-${(nota.tanggal || "").replace(/-/g, "")}.png`;
+        const shareTitle = `Invoice Deera ${kodeList.join(", ")} — ${tglShare}`;
+        const file = new File([blob], namaFileInv, { type: "image/png" });
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], title: shareTitle });
+        } else {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = namaFileInv;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      }, "image/png");
+    } catch (e) {
+      console.error("Share invoice error:", e);
+    } finally {
+      setSharingInvoice(false);
+    }
+  }
 
   return (
     <div className="rounded-2xl border border-border bg-surface overflow-hidden">
@@ -635,7 +687,7 @@ function NotaCard({ nota, isDeera, isMaster, onEdit, onHapus }) {
             </div>
           </div>
 
-          {/* ── TOTAL ── */}
+          {/* ── TOTAL HPP ── */}
           <div className="flex items-center justify-between rounded-2xl bg-navy-900 px-4 py-3">
             <span className="font-sans text-xs font-bold tracking-wide text-champagne-100">
               TOTAL / BAJU
@@ -643,6 +695,49 @@ function NotaCard({ nota, isDeera, isMaster, onEdit, onHapus }) {
             <span className="font-heading text-lg font-bold text-gold-300">
               {formatRp(grandTotal)}
             </span>
+          </div>
+
+          {/* ── INVOICE DEERA ── */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center gap-2">
+              <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-gold-500">
+                Invoice Deera
+              </span>
+              <div className="flex-1 h-px bg-border" />
+              <button
+                onClick={handleShareInvoice}
+                disabled={sharingInvoice}
+                className="rounded-lg bg-gold-500 px-2.5 py-1 font-sans text-xs font-semibold text-navy-900 disabled:opacity-40 active:opacity-70"
+              >
+                {sharingInvoice ? "..." : "BAGIKAN"}
+              </button>
+            </div>
+            <p className="font-sans text-[10px] text-charcoal-300 pl-1">
+              Tagihan jasa Deera ke Jihan
+            </p>
+            {invoiceRows.map((row, i) => (
+              <div key={i} className="flex items-start justify-between gap-2 pl-1">
+                <div>
+                  <span className="font-sans text-xs font-semibold text-navy-900">
+                    {row.kode}
+                  </span>
+                  <p className="font-sans text-[10px] text-charcoal-300">
+                    {row.pcs} pcs × {formatRp(totalJasa)}
+                  </p>
+                </div>
+                <span className="shrink-0 font-sans text-xs font-semibold text-navy-900">
+                  {formatRp(row.pcs * totalJasa)}
+                </span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between rounded-xl border border-gold-500/40 bg-gold-500/10 px-4 py-3">
+              <span className="font-sans text-xs font-bold text-gold-500">
+                TOTAL TAGIHAN JASA
+              </span>
+              <span className="font-heading text-lg font-bold text-navy-900">
+                {formatRp(totalTagihanJasa)}
+              </span>
+            </div>
           </div>
 
           {nota.alasan_tolak && (
@@ -825,6 +920,77 @@ function NotaCard({ nota, isDeera, isMaster, onEdit, onHapus }) {
           </span>
           <span className="font-heading text-2xl font-bold text-gold-300">
             {formatRp(grandTotal)}
+          </span>
+        </div>
+
+        {/* Footer */}
+        <p className="text-center font-sans text-[9px] text-charcoal-300">
+          Jihan Production
+        </p>
+      </div>
+
+      {/* ── InvoiceCard (off-screen, untuk html2canvas) ── */}
+      <div
+        ref={invoiceRef}
+        style={{
+          position: "fixed",
+          left: -9999,
+          top: 0,
+          width: 390,
+          zIndex: -1,
+        }}
+        className="bg-champagne-100 p-5 space-y-4"
+      >
+        {/* Header */}
+        <div className="space-y-0.5">
+          <p className="font-sans text-[10px] font-bold uppercase tracking-widest text-gold-500">
+            INVOICE DEERA
+          </p>
+          <p className="font-heading text-xl font-bold text-navy-900">
+            TAGIHAN JASA
+          </p>
+          <p className="font-sans text-xs text-charcoal-300">{tglShare}</p>
+        </div>
+
+        {/* Per-kode rows */}
+        <div className="rounded-2xl bg-white/70 p-4 space-y-3">
+          <div className="flex items-center justify-between border-b border-border pb-2">
+            <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-charcoal-300">
+              Kode
+            </span>
+            <div className="flex gap-4">
+              <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-charcoal-300">
+                Pcs
+              </span>
+              <span className="w-20 text-right font-sans text-[10px] font-bold uppercase tracking-widest text-charcoal-300">
+                Subtotal
+              </span>
+            </div>
+          </div>
+          {invoiceRows.map((row, i) => (
+            <div key={i} className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-sans text-sm font-semibold text-navy-900">
+                  {row.kode}
+                </p>
+                <p className="font-sans text-[10px] text-charcoal-300">
+                  {row.pcs} pcs × {formatRp(totalJasa)}/baju
+                </p>
+              </div>
+              <span className="shrink-0 font-sans text-sm font-bold text-navy-900">
+                {formatRp(row.pcs * totalJasa)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Total */}
+        <div className="flex items-center justify-between rounded-2xl bg-navy-900 px-4 py-4">
+          <span className="font-sans text-xs font-bold tracking-wide text-champagne-100">
+            TOTAL TAGIHAN JASA
+          </span>
+          <span className="font-heading text-2xl font-bold text-gold-300">
+            {formatRp(totalTagihanJasa)}
           </span>
         </div>
 
@@ -1383,6 +1549,7 @@ function FormEditNota({ nota, onBatal, onSimpan, isSaving }) {
               <input
                 type="number"
                 value={biayaProduksi[k] || ""}
+            
                 onChange={(e) =>
                   setBiayaProduksi({
                     ...biayaProduksi,
@@ -1546,7 +1713,8 @@ export function NotaListPage() {
                     key={nota.id}
                     nota={nota}
                     isDeera={isDeera}
-                                       onEdit={(nota) => {
+                    isMaster={isMaster}
+                    onEdit={(nota) => {
                       setEditingNota(nota);
                       setShowForm(true);
                     }}

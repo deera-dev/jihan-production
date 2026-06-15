@@ -11,7 +11,6 @@
 import { supabase } from './supabase'
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
 
 /**
  * Minta signed params dari Edge Function `cloudinary-sign`.
@@ -44,8 +43,8 @@ export async function uploadFotoSampel(file, folder = 'sampel') {
  * @returns {Promise<{ url: string, publicId: string }>}
  */
 export async function uploadFoto(file, { folder, getSignedParams }) {
-  if (!CLOUD_NAME || !UPLOAD_PRESET) {
-    throw new Error('VITE_CLOUDINARY_CLOUD_NAME / VITE_CLOUDINARY_UPLOAD_PRESET belum diisi di .env')
+  if (!CLOUD_NAME) {
+    throw new Error('VITE_CLOUDINARY_CLOUD_NAME belum diisi di .env')
   }
 
   const { signature, timestamp, apiKey } = await getSignedParams()
@@ -56,7 +55,7 @@ export async function uploadFoto(file, { folder, getSignedParams }) {
   form.append('timestamp', String(timestamp))
   form.append('signature', signature)
   form.append('folder', folder)
-  form.append('upload_preset', UPLOAD_PRESET)
+  // upload_preset tidak dipakai — signed upload pakai folder langsung
 
   const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
     method: 'POST',

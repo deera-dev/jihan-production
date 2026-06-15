@@ -18,5 +18,7 @@ export {
   useMulaiInputBukuPotong,
   useLanjutKeInputNota,
   useLanjutKeProduksiSetelahNota,
+  useTambahFotoKode,
+  useHapusSampel,
   useTambahCatatanSampel,
 } from './hooks/useKode'

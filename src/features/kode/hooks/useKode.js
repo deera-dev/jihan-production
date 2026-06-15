@@ -22,6 +22,8 @@ import {
   mulaiInputBukuPotong,
   lanjutKeInputNota,
   lanjutKeProduksiSetelahNota,
+  tambahFotoKode,
+  hapusSampel,
   lanjutTanpaSampel,
 } from '../api/kodeRepository'
 
@@ -234,6 +236,26 @@ export function useLanjutKeProduksiSetelahNota(kodeId) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kode', kodeId] })
       qc.invalidateQueries({ queryKey: ['produksi'] })
+    },
+  })
+}
+
+export function useTambahFotoKode(kodeId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload) => tambahFotoKode(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['kode', kodeId] })
+    },
+  })
+}
+
+export function useHapusSampel(kodeId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (sampelId) => hapusSampel(sampelId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['kode', kodeId] })
     },
   })
 }

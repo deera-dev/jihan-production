@@ -495,7 +495,34 @@ export async function lanjutTanpaSampel(kodeId) {
   return updateStatusKode(kodeId, { status: 'proses_potong' })
 }
 
+/** Hapus sampel (hard delete — hanya untuk gambar rusak/test). */
+export async function hapusSampel(sampelId) {
+  const { error } = await supabase.from('sampel').delete().eq('id', sampelId)
+  if (error) throw error
+}
+
 /** Recovery: kode stuck di input_nota padahal nota sudah approved → langsung ke produksi. */
 export async function lanjutKeProduksiSetelahNota(kodeId) {
   return updateStatusKode(kodeId, { status: 'produksi' })
+}
+
+/**
+ * Tambah foto ke kode (sampel atau foto barang jadi) TANPA mengubah status kode.
+ * Dipakai saat status sudah melewati sampel_dibuat (mis. produksi, siap_kirim).
+ */
+export async function tambahFotoKode({ kode_id, foto_depan_url, foto_belakang_url, versi, created_by }) {
+  const { data, error } = await supabase
+    .from('sampel')
+    .insert({
+      kode_id,
+      foto_depan_url,
+      foto_belakang_url: foto_belakang_url ?? null,
+      versi: versi ?? 1,
+      created_by,
+      status: 'aktif',
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
 }

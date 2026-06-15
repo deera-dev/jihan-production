@@ -3,7 +3,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { createHmac } from 'node:crypto'
+import { createHash } from 'node:crypto'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -29,15 +29,16 @@ serve(async (req) => {
     // Buat signed params
     const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET')!
     const apiKey = Deno.env.get('CLOUDINARY_API_KEY')!
-    const uploadPreset = Deno.env.get('CLOUDINARY_UPLOAD_PRESET')!
     const { folder = 'sampel' } = await req.json().catch(() => ({}))
 
     const timestamp = Math.round(Date.now() / 1000)
-    const toSign = `folder=${folder}&timestamp=${timestamp}&upload_preset=${uploadPreset}${apiSecret}`
-    const signature = createHmac('sha256', apiSecret).update(toSign).digest('hex')
+    // Cloudinary signed upload: SHA1(params_sorted_asc + api_secret)
+    // Tidak pakai upload_preset — cukup folder + timestamp
+    const toSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`
+    const signature = createHash('sha1').update(toSign).digest('hex')
 
     return new Response(
-      JSON.stringify({ signature, timestamp, apiKey, uploadPreset }),
+      JSON.stringify({ signature, timestamp, apiKey }),
       { headers: { ...CORS, 'Content-Type': 'application/json' } }
     )
   } catch (e) {

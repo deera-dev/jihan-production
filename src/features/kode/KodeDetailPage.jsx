@@ -16,6 +16,8 @@ import {
   useMulaiInputBukuPotong,
   useLanjutKeInputNota,
   useLanjutKeProduksiSetelahNota,
+  useTambahFotoKode,
+  useHapusSampel,
   useLanjutTanpaSampel,
 } from "./hooks/useKode";
 import {
@@ -195,6 +197,8 @@ export function KodeDetailPage() {
   const approveSampelMut = useApproveSampel(kodeId);
   const tolakSampelMut = useTolakSampel(kodeId);
   const buatSampelMut = useBuatSampelDanAjukanReview(kodeId);
+  const tambahFotoMut = useTambahFotoKode(kodeId);
+  const hapusSampelMut = useHapusSampel(kodeId);
   const tambahCatatanMut = useTambahCatatanSampel(kodeId);
   const produksiId = kode?.produksi_id ?? null;
   const { data: notaList = [] } = useNotaByProduksi(produksiId);
@@ -336,6 +340,7 @@ export function KodeDetailPage() {
             status={status}
             onUploadOpen={() => setShowUploadSampel(true)}
             onCatatanOpen={(sampelId) => setShowTambahCatatan(sampelId)}
+            onHapusSampel={(id) => hapusSampelMut.mutate(id)}
           />
         )}
         {tab === "BIAYA" && <TabBiaya nota={notaAktif} />}
@@ -400,19 +405,16 @@ export function KodeDetailPage() {
       {showUploadSampel && (
         <ModalUploadSampel
           kode={kode}
-          isPending={buatSampelMut.isPending}
+          isPending={buatSampelMut.isPending || tambahFotoMut.isPending}
           onSubmit={({ foto_depan_url, foto_belakang_url }) => {
             const versi = (kode.sampel?.length ?? 0) + 1;
-            buatSampelMut.mutate(
-              {
-                kode_id: kodeId,
-                foto_depan_url,
-                foto_belakang_url,
-                versi,
-                created_by: profile?.id,
-              },
-              { onSuccess: () => setShowUploadSampel(false) },
-            );
+            const payload = { kode_id: kodeId, foto_depan_url, foto_belakang_url, versi, created_by: profile?.id };
+            const onSuccess = () => setShowUploadSampel(false);
+            if (["produksi", "siap_kirim", "selesai"].includes(status)) {
+              tambahFotoMut.mutate(payload, { onSuccess });
+            } else {
+              buatSampelMut.mutate(payload, { onSuccess });
+            }
           }}
           onClose={() => setShowUploadSampel(false)}
         />
@@ -434,9 +436,11 @@ export function KodeDetailPage() {
 }
 
 // ─── TabSampel ────────────────────────────────────────────────────────────────
-function TabSampel({ kode, isDeera, status, onUploadOpen, onCatatanOpen }) {
+function TabSampel({ kode, isDeera, status, onUploadOpen, onCatatanOpen, onHapusSampel }) {
   const sampelList = [...(kode.sampel ?? [])].sort((a, b) => b.versi - a.versi);
   const bisaUpload = isDeera && status === "sampel_dibuat";
+  const bisaUploadFoto = isDeera && ["produksi", "siap_kirim", "selesai"].includes(status);
+  const labelUpload = bisaUpload ? "+ UPLOAD SAMPEL" : "+ UPLOAD FOTO";
   const showEstimasi = [
     "estimasi_pemakaian",
     "konfirmasi_pemakaian",
@@ -451,12 +455,12 @@ function TabSampel({ kode, isDeera, status, onUploadOpen, onCatatanOpen }) {
 
   return (
     <div className="space-y-4">
-      {bisaUpload && (
+      {(bisaUpload || bisaUploadFoto) && (
         <button
           onClick={onUploadOpen}
           className="w-full rounded-xl border-2 border-dashed border-gold-500 py-4 font-sans text-body font-semibold text-gold-500"
         >
-          + UPLOAD SAMPEL
+          {labelUpload}
         </button>
       )}
       {!bisaUpload && !showEstimasi && (
@@ -478,7 +482,9 @@ function TabSampel({ kode, isDeera, status, onUploadOpen, onCatatanOpen }) {
         <SampelCard
           key={s.id}
           sampel={s}
+          isDeera={isDeera}
           onTambahCatatan={() => onCatatanOpen(s.id)}
+          onHapus={onHapusSampel}
         />
       ))}
     </div>
@@ -608,25 +614,56 @@ function EstimasiSection({ kode, status, isDeera }) {
   );
 }
 
-function SampelCard({ sampel, onTambahCatatan }) {
+function SampelCard({ sampel, isDeera, onTambahCatatan, onHapus }) {
   const [lihatFoto, setLihatFoto] = useState(null);
+  const [konfirmasiHapus, setKonfirmasiHapus] = useState(false);
   return (
     <div className="rounded-xl bg-surface border border-border overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <p className="font-sans text-label font-semibold text-navy-900">
           VERSI {sampel.versi}
         </p>
-        <span
-          className={[
-            "rounded-full px-2 py-0.5 font-sans text-xs font-semibold",
-            sampel.status === "ditolak"
-              ? "bg-danger/10 text-danger"
-              : "bg-success/10 text-success",
-          ].join(" ")}
-        >
-          {sampel.status === "ditolak" ? "DITOLAK" : "AKTIF"}
-        </span>
+        <div className="flex items-center gap-2">
+          {isDeera && (
+            <button
+              onClick={() => setKonfirmasiHapus(true)}
+              className="font-sans text-xs font-semibold text-danger"
+            >
+              HAPUS
+            </button>
+          )}
+          <span
+            className={[
+              "rounded-full px-2 py-0.5 font-sans text-xs font-semibold",
+              sampel.status === "ditolak"
+                ? "bg-danger/10 text-danger"
+                : "bg-success/10 text-success",
+            ].join(" ")}
+          >
+            {sampel.status === "ditolak" ? "DITOLAK" : "AKTIF"}
+          </span>
+        </div>
       </div>
+      {konfirmasiHapus && (
+        <div className="fixed inset-0 z-[70] flex items-end bg-black/60">
+          <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
+            <p className="font-heading text-heading text-navy-900">HAPUS FOTO?</p>
+            <p className="font-sans text-body text-charcoal-600">
+              Foto versi {sampel.versi} akan dihapus permanen.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setKonfirmasiHapus(false)}
+                className="flex-1 rounded-xl border border-border py-3.5 font-sans text-body font-semibold text-charcoal-600">
+                BATAL
+              </button>
+              <button onClick={() => { onHapus(sampel.id); setKonfirmasiHapus(false); }}
+                className="flex-1 rounded-xl bg-danger py-3.5 font-sans text-body font-semibold text-white">
+                HAPUS
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2 p-3">
         {[sampel.foto_depan_url, sampel.foto_belakang_url]
           .filter(Boolean)
@@ -1501,11 +1538,14 @@ function ModalUploadSampel({ kode, isPending, onSubmit, onClose }) {
     setErr(null);
     setUploading(true);
     try {
-      const [urlDepan, urlBelakang] = await Promise.all([
+      const [hasilDepan, hasilBelakang] = await Promise.all([
         uploadFotoSampel(fotoDepan),
-        uploadFotoSampel(fotoBelakang),
+        uploadFotoSampel(fotoBelakang ?? null),
       ]);
-      onSubmit({ foto_depan_url: urlDepan, foto_belakang_url: urlBelakang });
+      onSubmit({
+        foto_depan_url: hasilDepan.url,
+        foto_belakang_url: hasilBelakang?.url ?? null,
+      });
     } catch {
       setErr("Gagal mengupload foto. Coba lagi.");
     } finally {
@@ -1635,14 +1675,14 @@ function ModalCatatan({ isPending, onSubmit, onClose }) {
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => setShowTambahCatatan(null)}
+              onClick={onClose}
               className="flex-1 rounded-xl border border-border py-3.5 font-sans text-body font-semibold text-charcoal-600"
             >
               BATAL
             </button>
             <button
               type="submit"
-              disabled={tambahCatatanMut.isPending}
+              disabled={isPending}
               className="flex-1 rounded-xl bg-gold-500 py-3.5 font-sans text-body font-semibold text-navy-900 disabled:opacity-50"
             >
               {isPending ? "MENYIMPAN..." : "SIMPAN"}
