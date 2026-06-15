@@ -24,7 +24,8 @@ export function DashboardPage() {
   const { data: listProduksi = [], isLoading } = useDaftarProduksi()
   const { data: saldoKasbon = 0 } = useSaldoKasbon()
 
-  const nama = profile?.nama_lengkap?.split(' ')[0] ?? (isDeera ? 'DEERA' : 'JIHAN')
+  const nama      = profile?.nama_panggilan || profile?.nama_lengkap?.split(' ')[0] || '—'
+  const labelRole = profile?.role === 'master' ? 'MASTER' : isDeera ? 'TIM DEERA' : 'TIM JIHAN'
 
   const kodePerluAksi = []
   const kodeAktif     = []
@@ -43,8 +44,12 @@ export function DashboardPage() {
   return (
     <div className="bg-champagne-100">
       <div className="sticky top-0 z-30 bg-navy-900 px-4 pt-8 pb-6">
-        <p className="font-sans text-label text-champagne-100 opacity-60">Halo,</p>
-        <h1 className="font-heading text-2xl text-champagne-100">{nama}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="font-heading text-2xl text-champagne-100">{nama}</h1>
+          <span className="rounded-full bg-champagne-100/10 border border-champagne-100/20 px-2.5 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-wide text-champagne-100/70">
+            {labelRole}
+          </span>
+        </div>
         <div className="mt-4 grid grid-cols-3 gap-2">
           <StatChip label="Produksi Aktif" value={jumlahProduksiAktif} />
           <StatChip label="Kode Aktif" value={kodeAktif.length} />
@@ -171,11 +176,11 @@ function KodeMiniCard({ kode, onClick }) {
       onClick={onClick}
       className="w-full rounded-xl bg-surface border border-border px-4 py-3 text-left flex items-center justify-between gap-3"
     >
-      <div className="flex items-center gap-2">
-        <p className="font-sans text-label font-semibold text-navy-900">{kode.kode_desain}</p>
+      <div className="flex items-center gap-2 min-w-0">
+        <p className="font-sans text-label font-semibold text-navy-900 truncate">{kode.kode_desain}</p>
         <StatusBadge status={kode.status} />
       </div>
-      <span className="text-charcoal-300 font-sans text-body">&#8250;</span>
+      <span className="shrink-0 font-sans text-label text-charcoal-300">&#8250;</span>
     </button>
   )
 }

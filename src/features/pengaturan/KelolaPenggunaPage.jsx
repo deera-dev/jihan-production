@@ -1,50 +1,106 @@
 // S-31 Kelola Pengguna — khusus Tim Deera (JP-004)
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { z } from 'zod'
-import { ambilSemuaUser, undangPengguna, hapusUser } from '../auth'
-
-const undangSchema = z.object({
-  email: z.string().min(1, 'Email wajib diisi').email('Format email tidak valid'),
-  nama_lengkap: z.string().min(1, 'Nama wajib diisi'),
-  role: z.enum(['deera', 'jihan', 'master'], { required_error: 'Pilih role' }),
-})
+import { ambilSemuaUser, ambilUserPending, setujuiUser, hapusUser } from '../auth'
 
 const OPSI_ROLE = [
-  { value: 'jihan',  label: 'Tim Jihan',  desc: 'Read-only + approve' },
-  { value: 'deera',  label: 'Tim Deera',  desc: 'Full CRUD' },
-  { value: 'master', label: 'Master',     desc: 'Lihat semua role' },
+  { value: 'jihan', label: 'Tim Jihan', desc: 'Read-only + approve' },
+  { value: 'deera', label: 'Tim Deera', desc: 'Full CRUD' },
 ]
 
 const LABEL_ROLE = { deera: 'Tim Deera', jihan: 'Tim Jihan', master: 'Master' }
 
+function PendingCard({ user, onSetujui, isLoading }) {
+  const [roleYangDipilih, setRoleYangDipilih] = useState('jihan')
+  const [buka, setBuka] = useState(false)
+
+  return (
+    <div className="rounded-xl border border-gold-500/40 bg-gold-500/5 px-4 py-4 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="font-sans text-sm font-semibold text-navy-900">
+            {user.nama_panggilan ?? '(Belum ada nama)'}
+          </p>
+          {user.username && (
+            <p className="font-sans text-xs text-charcoal-300">@{user.username}</p>
+          )}
+          <span className="mt-1 inline-block rounded-full bg-gold-500/20 px-2 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-wide text-gold-500">
+            Menunggu persetujuan
+          </span>
+        </div>
+        <button
+          onClick={() => setBuka((v) => !v)}
+          className="rounded-lg bg-gold-500 px-3 py-1.5 font-sans text-xs font-bold text-navy-900 active:opacity-70"
+        >
+          SETUJUI
+        </button>
+      </div>
+
+      {buka && (
+        <div className="space-y-3 border-t border-gold-500/20 pt-3">
+          <p className="font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-600">
+            Pilih Role
+          </p>
+          <div className="flex gap-2">
+            {OPSI_ROLE.map((r) => (
+              <button
+                key={r.value}
+                onClick={() => setRoleYangDipilih(r.value)}
+                className={[
+                  'flex-1 rounded-xl border py-2.5 font-sans text-xs font-bold transition-colors',
+                  roleYangDipilih === r.value
+                    ? 'border-navy-900 bg-navy-900 text-champagne-100'
+                    : 'border-border text-charcoal-600',
+                ].join(' ')}
+              >
+                {r.label}
+                <p className="mt-0.5 font-sans text-[10px] font-normal opacity-70">{r.desc}</p>
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setBuka(false)}
+              className="flex-1 rounded-xl border border-border py-2.5 font-sans text-xs font-semibold text-charcoal-600"
+            >
+              BATAL
+            </button>
+            <button
+              onClick={() => onSetujui(user.id, roleYangDipilih)}
+              disabled={isLoading}
+              className="flex-1 rounded-xl bg-navy-900 py-2.5 font-sans text-xs font-bold text-champagne-100 disabled:opacity-50"
+            >
+              {isLoading ? 'MENYIMPAN...' : 'KONFIRMASI'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function KelolaPenggunaPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [formTerbuka, setFormTerbuka] = useState(false)
-  const [sukses, setSukses] = useState(false)
-  const [hapusTarget, setHapusTarget] = useState(null) // { id, nama_lengkap }
+  const [hapusTarget, setHapusTarget] = useState(null)
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: ambilSemuaUser,
   })
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
-    resolver: zodResolver(undangSchema),
-    defaultValues: { role: 'jihan' },
+  const { data: pending = [], isLoading: loadingPending } = useQuery({
+    queryKey: ['users-pending'],
+    queryFn: ambilUserPending,
+    refetchInterval: 30_000, // poll tiap 30 detik
   })
 
-  const { mutate: kirimUndangan, isPending, error: errorUndang } = useMutation({
-    mutationFn: undangPengguna,
+  const { mutate: jalankanSetujui, isPending: isSetujuiPending } = useMutation({
+    mutationFn: ({ userId, role }) => setujuiUser(userId, role),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      reset()
-      setSukses(true)
-      setFormTerbuka(false)
+      queryClient.invalidateQueries({ queryKey: ['users-pending'] })
     },
   })
 
@@ -56,107 +112,75 @@ export function KelolaPenggunaPage() {
     },
   })
 
-  function onSubmit(values) {
-    setSukses(false)
-    kirimUndangan({ ...values, nama_lengkap: values.nama_lengkap.toUpperCase() })
-  }
-
   return (
     <div className="bg-champagne-100">
       <div className="sticky top-0 z-30 flex items-center gap-3 bg-navy-900 px-4 py-5">
-        <button onClick={() => navigate(-1)} className="font-sans text-body text-champagne-100">&#8592;</button>
-        <h1 className="font-heading text-heading text-champagne-100">KELOLA PENGGUNA</h1>
-        <div className="flex-1" />
-        <button
-          onClick={() => { setFormTerbuka((v) => !v); setSukses(false) }}
-          className="rounded-lg bg-gold-500 px-3 py-1.5 font-sans text-xs font-semibold text-navy-900"
-        >
-          + UNDANG
+        <button onClick={() => navigate(-1)} className="font-sans text-body text-champagne-100">
+          &#8592;
         </button>
+        <h1 className="font-heading text-heading text-champagne-100">KELOLA PENGGUNA</h1>
       </div>
 
-      <div className="px-4 py-5 space-y-4">
-        {sukses && (
-          <div className="rounded-xl bg-success/10 border border-success/30 px-4 py-3">
-            <p className="font-sans text-label font-semibold text-success">
-              Undangan berhasil dikirim ke email yang dituju.
-            </p>
-          </div>
-        )}
-
-        {formTerbuka && (
-          <div className="rounded-xl bg-surface border border-border p-4 space-y-4">
-            <p className="font-sans text-label font-semibold text-charcoal-600 uppercase tracking-widest">
-              UNDANG PENGGUNA BARU
-            </p>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-              <div>
-                <label className="mb-1 block font-sans text-label text-charcoal-600">EMAIL *</label>
-                <input
-                  type="email"
-                  className="w-full rounded-lg border border-border bg-champagne-100 px-4 py-3 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
-                  {...register('email')}
-                />
-                {errors.email && <p className="mt-1 font-sans text-label text-danger">{errors.email.message}</p>}
-              </div>
-              <div>
-                <label className="mb-1 block font-sans text-label text-charcoal-600">NAMA LENGKAP *</label>
-                <input
-                  type="text"
-                  className="w-full rounded-lg border border-border bg-champagne-100 px-4 py-3 font-sans text-body text-navy-900 uppercase outline-none focus:border-gold-500"
-                  {...register('nama_lengkap')}
-                />
-                {errors.nama_lengkap && <p className="mt-1 font-sans text-label text-danger">{errors.nama_lengkap.message}</p>}
-              </div>
-              <div>
-                <label className="mb-2 block font-sans text-label text-charcoal-600">ROLE *</label>
-                <div className="flex flex-col gap-2">
-                  {OPSI_ROLE.map((r) => (
-                    <label key={r.value} className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-champagne-100 px-4 py-3 has-[:checked]:border-gold-500 has-[:checked]:bg-gold-500/10">
-                      <input type="radio" value={r.value} {...register('role')} className="accent-gold-500" />
-                      <div>
-                        <span className="font-sans text-body font-semibold text-navy-900">{r.label}</span>
-                        <span className="ml-2 font-sans text-xs text-charcoal-300">{r.desc}</span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                {errors.role && <p className="mt-1 font-sans text-label text-danger">{errors.role.message}</p>}
-              </div>
-              {errorUndang && (
-                <p className="font-sans text-label text-danger">
-                  {errorUndang.message ?? 'Gagal mengirim undangan. Coba lagi.'}
-                </p>
-              )}
-              <button
-                type="submit"
-                disabled={isPending}
-                className="w-full rounded-lg bg-navy-900 py-3 font-sans text-button text-champagne-100 disabled:opacity-60"
-              >
-                {isPending ? 'MENGIRIM...' : 'KIRIM UNDANGAN'}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {isLoading ? (
-          <p className="py-8 text-center font-sans text-body text-charcoal-300">MEMUAT...</p>
-        ) : users.length === 0 ? (
-          <p className="py-8 text-center font-sans text-body text-charcoal-300">Belum ada pengguna terdaftar.</p>
-        ) : (
+      <div className="px-4 py-5 space-y-6 pb-24">
+        {/* ── PENDING ── */}
+        {(loadingPending || pending.length > 0) && (
           <div className="space-y-3">
-            {users.map((u) => (
+            <div className="flex items-center gap-2">
+              <p className="font-sans text-xs font-bold uppercase tracking-widest text-gold-500">
+                Menunggu Persetujuan
+              </p>
+              {pending.length > 0 && (
+                <span className="rounded-full bg-gold-500 px-2 py-0.5 font-sans text-[10px] font-bold text-navy-900">
+                  {pending.length}
+                </span>
+              )}
+              <div className="flex-1 h-px bg-gold-500/20" />
+            </div>
+
+            {loadingPending ? (
+              <p className="font-sans text-xs text-charcoal-300">MEMUAT...</p>
+            ) : (
+              pending.map((u) => (
+                <PendingCard
+                  key={u.id}
+                  user={u}
+                  onSetujui={(userId, role) => jalankanSetujui({ userId, role })}
+                  isLoading={isSetujuiPending}
+                />
+              ))
+            )}
+          </div>
+        )}
+
+        {/* ── AKTIF ── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <p className="font-sans text-xs font-bold uppercase tracking-widest text-charcoal-300">
+              Pengguna Aktif
+            </p>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          {isLoading ? (
+            <p className="py-8 text-center font-sans text-body text-charcoal-300">MEMUAT...</p>
+          ) : users.length === 0 ? (
+            <p className="py-8 text-center font-sans text-body text-charcoal-300">
+              Belum ada pengguna aktif.
+            </p>
+          ) : (
+            users.map((u) => (
               <div key={u.id} className="rounded-xl bg-surface border border-border px-4 py-4">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-sans text-body font-semibold text-navy-900">
-                      {u.nama_lengkap ?? '(Belum diisi)'}
+                    <p className="font-sans text-sm font-semibold text-navy-900">
+                      {u.nama_panggilan || u.nama_lengkap || '(Belum diisi)'}
                     </p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="rounded-full bg-champagne-200 px-2.5 py-0.5 font-sans text-xs font-semibold text-charcoal-600 uppercase">
-                        {LABEL_ROLE[u.role] ?? u.role}
-                      </span>
-                    </div>
+                    {u.username && (
+                      <p className="font-sans text-xs text-charcoal-300">@{u.username}</p>
+                    )}
+                    <span className="mt-1 inline-block rounded-full bg-champagne-200 px-2.5 py-0.5 font-sans text-xs font-semibold uppercase text-charcoal-600">
+                      {LABEL_ROLE[u.role] ?? u.role ?? '—'}
+                    </span>
                   </div>
                   <button
                     onClick={() => setHapusTarget(u)}
@@ -166,32 +190,41 @@ export function KelolaPenggunaPage() {
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Modal Konfirmasi Hapus */}
-          {hapusTarget && (
-            <div className="fixed inset-0 z-[60] flex items-end bg-black/60">
-              <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
-                <p className="font-heading text-heading text-navy-900">HAPUS PENGGUNA</p>
-                <p className="font-sans text-body text-charcoal-600">
-                  Hapus akun <span className="font-semibold text-navy-900">{hapusTarget.nama_lengkap}</span>? Pengguna tidak bisa login lagi setelah dihapus.
-                </p>
-                <div className="flex gap-3">
-                  <button onClick={() => setHapusTarget(null)}
-                    className="flex-1 rounded-xl border border-border py-3.5 font-sans text-body font-semibold text-charcoal-600">
-                    BATAL
-                  </button>
-                  <button onClick={() => jalankanHapus(hapusTarget.id)} disabled={isHapusPending}
-                    className="flex-1 rounded-xl bg-danger py-3.5 font-sans text-body font-semibold text-white disabled:opacity-50">
-                    {isHapusPending ? 'MENGHAPUS...' : 'HAPUS'}
-                  </button>
-                </div>
-              </div>
-            </div>
+            ))
           )}
         </div>
+      </div>
+
+      {/* Modal Konfirmasi Hapus */}
+      {hapusTarget && (
+        <div className="fixed inset-0 z-[60] flex items-end bg-black/60">
+          <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
+            <p className="font-heading text-heading text-navy-900">HAPUS PENGGUNA</p>
+            <p className="font-sans text-body text-charcoal-600">
+              Hapus akun{' '}
+              <span className="font-semibold text-navy-900">
+                {hapusTarget.nama_panggilan || hapusTarget.nama_lengkap}
+              </span>
+              ? Pengguna tidak bisa login lagi setelah dihapus.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setHapusTarget(null)}
+                className="flex-1 rounded-xl border border-border py-3.5 font-sans text-body font-semibold text-charcoal-600"
+              >
+                BATAL
+              </button>
+              <button
+                onClick={() => jalankanHapus(hapusTarget.id)}
+                disabled={isHapusPending}
+                className="flex-1 rounded-xl bg-danger py-3.5 font-sans text-body font-semibold text-white disabled:opacity-50"
+              >
+                {isHapusPending ? 'MENGHAPUS...' : 'HAPUS'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

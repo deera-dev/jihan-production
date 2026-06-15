@@ -1,9 +1,18 @@
-// Public surface fitur `auth` — slice lain HANYA boleh import dari sini,
-// tidak boleh menjangkau langsung ke dalam internal (components/, api/, dll).
+// Public surface fitur `auth`
 
 export { LoginPage } from './LoginPage'
+export { RegisterPage } from './RegisterPage'
+export { PendingPage } from './PendingPage'
 export { InvitePage } from './InvitePage'
 export { ProtectedRoute } from './components/ProtectedRoute'
 export { useSession } from './hooks/useSession'
 export { useLogin } from './hooks/useLogin'
-export { logout, undangPengguna, hapusUser, ambilSemuaUser } from './api/authRepository'
+export {
+  logout,
+  hapusUser,
+  ambilSemuaUser,
+  ambilUserPending,
+  setujuiUser,
+  updateProfil,
+  ambilProfil,
+} from './api/authRepository'

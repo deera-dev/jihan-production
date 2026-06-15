@@ -30,12 +30,18 @@ export function PengaturanPage() {
       </div>
 
       <div className="px-4 py-5 space-y-5">
+        {/* Info profil */}
         <div className="rounded-xl bg-surface border border-border p-4">
-          <p className="font-sans text-body font-semibold text-navy-900">{profile?.nama_lengkap ?? '\u2014'}</p>
-          <p className="mt-0.5 font-sans text-label text-charcoal-600">{user?.email ?? '\u2014'}</p>
+          <p className="font-sans text-body font-semibold text-navy-900">
+            {profile?.nama_panggilan || profile?.nama_lengkap || '—'}
+          </p>
+          {profile?.username && (
+            <p className="font-sans text-label text-charcoal-300">@{profile.username}</p>
+          )}
+          <p className="mt-0.5 font-sans text-label text-charcoal-600">{user?.email ?? '—'}</p>
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <span className="inline-block rounded-full bg-champagne-200 px-3 py-0.5 font-sans text-xs font-semibold text-charcoal-600">
-              {LABEL_ROLE[actualRole] ?? actualRole?.toUpperCase() ?? '\u2014'}
+              {LABEL_ROLE[actualRole] ?? actualRole?.toUpperCase() ?? '—'}
             </span>
             {isMaster && (
               <span className="inline-block rounded-full bg-gold-500/20 border border-gold-500 px-3 py-0.5 font-sans text-xs font-semibold text-gold-500">
@@ -45,9 +51,17 @@ export function PengaturanPage() {
           </div>
         </div>
 
+        {/* Akun — semua role */}
         <section>
           <p className="mb-2 font-sans text-label font-semibold text-charcoal-300 uppercase tracking-widest">Akun</p>
           <div className="rounded-xl bg-surface border border-border divide-y divide-border">
+            <button
+              className="flex w-full items-center justify-between px-4 py-3.5"
+              onClick={() => navigate('/pengaturan/profil')}
+            >
+              <span className="font-sans text-body text-navy-900">Edit Profil</span>
+              <span className="font-sans text-label text-charcoal-300">&#8250;</span>
+            </button>
             <button
               className="flex w-full items-center justify-between px-4 py-3.5"
               onClick={() => navigate('/ganti-password')}
@@ -58,23 +72,45 @@ export function PengaturanPage() {
           </div>
         </section>
 
+        {/* Master-only */}
+        {isMaster && (
+          <section>
+            <p className="mb-2 font-sans text-label font-semibold text-charcoal-300 uppercase tracking-widest">Master</p>
+            <div className="rounded-xl bg-surface border border-border divide-y divide-border">
+              <button
+                className="flex w-full items-center justify-between px-4 py-3.5"
+                onClick={() => navigate('/pengaturan/template-hpp')}
+              >
+                <span className="font-sans text-body text-navy-900">Template HPP</span>
+                <span className="font-sans text-label text-charcoal-300">&#8250;</span>
+              </button>
+              <button
+                className="flex w-full items-center justify-between px-4 py-3.5"
+                onClick={() => navigate('/pengaturan/pengguna')}
+              >
+                <span className="font-sans text-body text-navy-900">Kelola Pengguna</span>
+                <span className="font-sans text-label text-charcoal-300">&#8250;</span>
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* Deera: activity log & data terhapus */}
         {isDeera && (
           <section>
             <p className="mb-2 font-sans text-label font-semibold text-charcoal-300 uppercase tracking-widest">Sistem</p>
             <div className="rounded-xl bg-surface border border-border divide-y divide-border">
-              <button className="flex w-full items-center justify-between px-4 py-3.5" onClick={() => navigate('/pengaturan/template-hpp')}>
-                <span className="font-sans text-body text-navy-900">Template HPP</span>
-                <span className="font-sans text-label text-charcoal-300">&#8250;</span>
-              </button>
-              <button className="flex w-full items-center justify-between px-4 py-3.5" onClick={() => navigate('/pengaturan/pengguna')}>
-                <span className="font-sans text-body text-navy-900">Kelola Pengguna</span>
-                <span className="font-sans text-label text-charcoal-300">&#8250;</span>
-              </button>
-              <button className="flex w-full items-center justify-between px-4 py-3.5" onClick={() => navigate('/pengaturan/activity-log')}>
+              <button
+                className="flex w-full items-center justify-between px-4 py-3.5"
+                onClick={() => navigate('/pengaturan/activity-log')}
+              >
                 <span className="font-sans text-body text-navy-900">Activity Log</span>
                 <span className="font-sans text-label text-charcoal-300">&#8250;</span>
               </button>
-              <button className="flex w-full items-center justify-between px-4 py-3.5" onClick={() => navigate('/pengaturan/data-terhapus')}>
+              <button
+                className="flex w-full items-center justify-between px-4 py-3.5"
+                onClick={() => navigate('/pengaturan/data-terhapus')}
+              >
                 <span className="font-sans text-body text-navy-900">Data Terhapus</span>
                 <span className="font-sans text-label text-charcoal-300">&#8250;</span>
               </button>
@@ -82,11 +118,15 @@ export function PengaturanPage() {
           </section>
         )}
 
+        {/* Aplikasi */}
         <section>
           <p className="mb-2 font-sans text-label font-semibold text-charcoal-300 uppercase tracking-widest">Aplikasi</p>
           <div className="rounded-xl bg-surface border border-border divide-y divide-border">
             {!isDeera && (
-              <button className="flex w-full items-center justify-between px-4 py-3.5" onClick={() => navigate('/pengaturan/notifikasi')}>
+              <button
+                className="flex w-full items-center justify-between px-4 py-3.5"
+                onClick={() => navigate('/pengaturan/notifikasi')}
+              >
                 <span className="font-sans text-body text-navy-900">Mode Notifikasi</span>
                 <span className="font-sans text-label text-charcoal-300">&#8250;</span>
               </button>

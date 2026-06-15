@@ -5,7 +5,7 @@
 
 import { Routes, Route, Navigate } from 'react-router-dom'
 
-import { LoginPage, InvitePage, ProtectedRoute, useSession } from './features/auth'
+import { LoginPage, RegisterPage, PendingPage, InvitePage, ProtectedRoute, useSession } from './features/auth'
 import { AppLayout } from './components/layout/AppLayout'
 
 import { DashboardPage } from './features/dashboard'
@@ -15,7 +15,7 @@ import { BukuPotongPage } from './features/buku-potong'
 import { NotaListPage } from './features/nota'
 import { KasbonPage } from './features/kasbon'
 import { NotifikasiPage } from './features/notifikasi'
-import { PengaturanPage, KelolaPenggunaPage, ActivityLogPage, DataTerhapusPage, GantiPasswordPage, TemplateHPPPage } from './features/pengaturan'
+import { PengaturanPage, KelolaPenggunaPage, ActivityLogPage, DataTerhapusPage, GantiPasswordPage, EditProfilPage, TemplateHPPPage } from './features/pengaturan'
 
 import { ROLE } from './constants/enums'
 
@@ -28,6 +28,8 @@ export function App() {
     <Routes>
       {/* Publik */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/daftar" element={<RegisterPage />} />
+      <Route path="/menunggu" element={<PendingPage />} />
       <Route path="/undangan" element={<InvitePage />} />
 
       {/* Authenticated: dengan AppLayout (bottom nav) */}
@@ -43,8 +45,9 @@ export function App() {
           <Route path="/produksi/:produksiId" element={<ProduksiDetailPage />} />
           <Route path="/kode/:kodeId" element={<KodeDetailPage />} />
 
-          {/* Pengaturan */}
+          {/* Pengaturan — semua role */}
           <Route path="/pengaturan" element={<PengaturanPage />} />
+          <Route path="/pengaturan/profil" element={<EditProfilPage />} />
           <Route path="/ganti-password" element={<GantiPasswordPage />} />
           <Route path="/pengaturan/notifikasi" element={<NotifikasiPage />} />
 
@@ -54,9 +57,13 @@ export function App() {
             <Route path="/produksi/buat" element={<BuatProduksiPage />} />
             <Route path="/kode/baru" element={<BuatKodePage />} />
             <Route path="/produksi/:produksiId/buku-potong" element={<BukuPotongPage />} />
-            <Route path="/pengaturan/pengguna" element={<KelolaPenggunaPage />} />
             <Route path="/pengaturan/activity-log" element={<ActivityLogPage />} />
             <Route path="/pengaturan/data-terhapus" element={<DataTerhapusPage />} />
+          </Route>
+
+          {/* Khusus Master */}
+          <Route element={<ProtectedRoute allowedRoles={[ROLE.MASTER]} />}>
+            <Route path="/pengaturan/pengguna" element={<KelolaPenggunaPage />} />
             <Route path="/pengaturan/template-hpp" element={<TemplateHPPPage />} />
           </Route>
 

@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
 
     const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { role, nama_lengkap: (nama_lengkap ?? '').toUpperCase() },
+      redirectTo: 'https://jihan.deera.id',
     })
 
     if (error) {

@@ -18,6 +18,11 @@ export function ProtectedRoute({ allowedRoles }) {
     return <Navigate to="/login" replace state={{ from: location }} />
   }
 
+  // Pending user → halaman menunggu (kecuali sudah di /menunggu)
+  if (profile.status === 'pending') {
+    return <Navigate to="/menunggu" replace />
+  }
+
   // Master melewati semua role guard
   if (profile.role === ROLE.MASTER) return <Outlet />
 
