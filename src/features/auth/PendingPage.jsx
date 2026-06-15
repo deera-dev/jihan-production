@@ -1,12 +1,15 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/useAuthStore'
 import { logout } from './api/authRepository'
 
 export function PendingPage() {
+  const navigate = useNavigate()
   const { clearSession, profile } = useAuthStore()
 
   async function handleLogout() {
     await logout()
     clearSession()
+    navigate('/login', { replace: true })
   }
 
   return (

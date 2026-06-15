@@ -41,9 +41,6 @@ export function RegisterPage() {
             Akun Anda sudah terdaftar dan sedang menunggu persetujuan admin.
             Anda akan mendapat notifikasi setelah akun diaktifkan.
           </p>
-          <p className="font-sans text-xs text-charcoal-300">
-            Sementara itu, cek email Anda untuk konfirmasi alamat email.
-          </p>
           <Link
             to="/login"
             className="block w-full rounded-xl bg-navy-900 px-4 py-3.5 text-center font-sans text-button font-bold tracking-wide text-champagne-100 active:opacity-80"
