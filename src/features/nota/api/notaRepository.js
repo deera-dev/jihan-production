@@ -15,10 +15,24 @@ export async function ambilNotaByProduksi(produksiId) {
       created_at, created_by,
       nota_kode (
         kode_id,
-        kode:kode_id (id, kode_desain, status)
+        kode:kode_id (
+          id, kode_desain, status,
+          kode_ukuran (
+            kode_ukuran_warna (jumlah_pcs)
+          ),
+          sampel (foto_url, foto_url_2, status)
+        )
+      ),
+      produksi:produksi_id (
+        produksi_bahan (
+          jenis_bahan, tipe_bahan, harga_per_satuan,
+          konsumsi_per_pcs, satuan_konsumsi,
+          produksi_bahan_warna (nama_warna, yard_terpakai)
+        )
       )
     `)
     .eq('produksi_id', produksiId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
@@ -40,8 +54,9 @@ export async function ambilNotaByProduksi(produksiId) {
  */
 export async function buatNota({
   produksi_id, kode_ids, tanggal, catatan,
-  bahan, aksesoris, biaya_produksi, biaya_jual_beli, created_by,
+  aksesoris, biaya_produksi, biaya_jual_beli, created_by,
 }) {
+  // Nota langsung approved — tidak ada review Jihan untuk nota
   const { data: nota, error: errNota } = await supabase
     .from('nota_pembelian')
     .insert({
@@ -51,10 +66,9 @@ export async function buatNota({
       aksesoris: aksesoris ?? [],
       biaya_produksi: biaya_produksi ?? {},
       biaya_jual_beli: biaya_jual_beli ?? 20000,
-      status: 'draft',
+      status: 'approved',
+      approved_at: new Date().toISOString(),
       created_by,
-      // simpan bahan di kolom aksesoris sementara pakai field baru nanti
-      // untuk sekarang simpan di catatan-json atau gunakan kolom yang ada
     })
     .select()
     .single()
@@ -65,6 +79,15 @@ export async function buatNota({
     const rows = kode_ids.map((kid) => ({ nota_id: nota.id, kode_id: kid }))
     const { error: errKode } = await supabase.from('nota_kode').insert(rows)
     if (errKode) throw errKode
+
+    // Advance kode ke produksi — tidak perlu review Jihan
+    // DB trigger akan auto-buat tracking_produksi saat status -> 'produksi'
+    const { error: errStatus } = await supabase
+      .from('kode')
+      .update({ status: 'produksi' })
+      .in('id', kode_ids)
+      .in('status', ['input_nota', 'input_hpp', 'hpp_ditolak', 'review_hpp'])
+    if (errStatus) throw errStatus
   }
 
   return nota
@@ -147,4 +170,42 @@ export async function tolakNota(notaId, alasan) {
       .eq('status', 'review_hpp')
     if (errKode) throw errKode
   }
+}
+
+/**
+ * Hapus nota (soft delete — set deleted_at).
+ * Akses dikontrol RLS:
+ *   - Master       : boleh hapus semua status
+ *   - Deera biasa  : hanya draft & ditolak (RLS blokir yang lain)
+ */
+export async function hapusNota(notaId) {
+  const { error } = await supabase
+    .from('nota_pembelian')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', notaId)
+  if (error) throw error
+  return { ok: true }
+}
+
+/**
+ * Update nota.
+ * Akses dikontrol RLS:
+ *   - Master       : boleh edit semua status
+ *   - Deera biasa  : hanya draft & ditolak (RLS blokir yang lain)
+ */
+export async function updateNota(notaId, payload) {
+  const { data, error } = await supabase
+    .from('nota_pembelian')
+    .update({
+      tanggal: payload.tanggal,
+      catatan: payload.catatan?.toUpperCase() ?? null,
+      aksesoris: payload.aksesoris ?? [],
+      biaya_produksi: payload.biaya_produksi ?? {},
+      biaya_jual_beli: payload.biaya_jual_beli ?? 20000,
+    })
+    .eq('id', notaId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
 }

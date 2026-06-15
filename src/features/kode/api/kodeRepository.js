@@ -311,7 +311,32 @@ export async function approveHPP(hppId, kodeId) {
     .update({ status: 'approved', approved_at: new Date().toISOString() })
     .eq('id', hppId)
   if (error) throw error
-  return updateStatusKode(kodeId, { status: 'produksi' })
+
+  await updateStatusKode(kodeId, { status: 'produksi' })
+
+  // Buat tracking_produksi untuk setiap kode_ukuran_warna × 4 tahap
+  const TAHAP = ['dipotong', 'dijahit', 'finishing', 'siap_kirim']
+  const { data: ukuranList } = await supabase
+    .from('kode_ukuran')
+    .select('id, kode_ukuran_warna(id)')
+    .eq('kode_id', kodeId)
+  if (ukuranList) {
+    const rows = []
+    for (const uk of ukuranList) {
+      for (const w of uk.kode_ukuran_warna ?? []) {
+        for (const tahap of TAHAP) {
+          rows.push({ kode_ukuran_warna_id: w.id, tahap, pcs_done: 0 })
+        }
+      }
+    }
+    if (rows.length > 0) {
+      await supabase.from('tracking_produksi').upsert(rows, {
+        onConflict: 'kode_ukuran_warna_id,tahap',
+        ignoreDuplicates: true,
+      })
+    }
+  }
+  return { ok: true }
 }
 
 /**
@@ -393,8 +418,8 @@ export async function buatSampelDanAjukanReview({
     .single()
   if (errSampel) throw errSampel
 
-  // 2. Update kode status → review_sampel
-  await updateStatusKode(kode_id, { status: 'review_sampel' })
+  // 2. Update kode status → proses_potong (langsung, tanpa review/estimasi)
+  await updateStatusKode(kode_id, { status: 'proses_potong' })
 
   return sampel
 }
@@ -405,7 +430,7 @@ export async function buatSampelDanAjukanReview({
 
 /** Konfirmasi estimasi → lanjut ke konfirmasi_pemakaian. */
 export async function konfirmasiEstimasi(kodeId) {
-  return updateStatusKode(kodeId, { status: 'konfirmasi_pemakaian' })
+  return updateStatusKode(kodeId, { status: 'proses_potong' })
 }
 
 /** Lanjutkan dari konfirmasi_pemakaian → proses_potong. */
@@ -437,4 +462,9 @@ export async function mulaiInputBukuPotong(kodeId) {
 /** Selesai buku potong → lanjut ke input_nota (untuk buat Nota Biaya). */
 export async function lanjutKeInputNota(kodeId) {
   return updateStatusKode(kodeId, { status: 'input_nota' })
+}
+
+/** Skip sampel → langsung ke proses_potong. */
+export async function lanjutTanpaSampel(kodeId) {
+  return updateStatusKode(kodeId, { status: 'proses_potong' })
 }

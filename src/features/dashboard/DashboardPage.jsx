@@ -42,7 +42,7 @@ export function DashboardPage() {
 
   return (
     <div className="bg-champagne-100">
-      <div className="bg-navy-900 px-4 pt-8 pb-6">
+      <div className="sticky top-0 z-30 bg-navy-900 px-4 pt-8 pb-6">
         <p className="font-sans text-label text-champagne-100 opacity-60">Halo,</p>
         <h1 className="font-heading text-2xl text-champagne-100">{nama}</h1>
         <div className="mt-4 grid grid-cols-3 gap-2">

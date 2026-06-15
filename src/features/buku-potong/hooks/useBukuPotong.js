@@ -1,13 +1,22 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { simpanBukuPotong } from '../api/bukuPotongRepository'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { ambilProduksiBukuPotong, simpanBukuPotongProduksi } from '../api/bukuPotongRepository'
 
-export function useBukuPotongMutations(kodeId) {
+export function useProduksiBukuPotong(produksiId) {
+  return useQuery({
+    queryKey: ['bukupotong-produksi', produksiId],
+    queryFn: () => ambilProduksiBukuPotong(produksiId),
+    enabled: !!produksiId,
+  })
+}
+
+export function useBukuPotongMutations(produksiId) {
   const qc = useQueryClient()
   const mutation = useMutation({
-    mutationFn: simpanBukuPotong,
+    mutationFn: simpanBukuPotongProduksi,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['kode', kodeId] })
+      qc.invalidateQueries({ queryKey: ['bukupotong-produksi', produksiId] })
       qc.invalidateQueries({ queryKey: ['produksi'] })
+      qc.invalidateQueries({ queryKey: ['kode'] })
     },
   })
   return {

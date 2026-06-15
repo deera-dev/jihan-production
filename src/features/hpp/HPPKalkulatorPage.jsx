@@ -165,7 +165,7 @@ export function HPPKalkulatorPage() {
   return (
     <div className="min-h-screen bg-champagne-100">
       {/* Header */}
-      <div className="bg-navy-900 px-4 py-5">
+      <div className="sticky top-0 z-30 bg-navy-900 px-4 py-5">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="font-sans text-sm text-champagne-100 opacity-70">← KEMBALI</button>
           <div className="flex-1">
@@ -384,11 +384,4 @@ function Section({ title, total, children }) {
   )
 }
 
-function KalcRow({ label, value, bold }) {
-  return (
-    <div className="flex justify-between items-center">
-      <p className={['font-sans text-label', bold ? 'font-semibold text-navy-900' : 'text-charcoal-600'].join(' ')}>{label}</p>
-      <p className={['font-sans text-label', bold ? 'font-semibold text-navy-900' : 'text-navy-900'].join(' ')}>{value}</p>
-    </div>
-  )
-}
+function KalcRo

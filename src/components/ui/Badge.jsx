@@ -4,6 +4,7 @@
 const TONE = {
   navy: 'bg-navy-900 text-champagne-100',
   gold: 'bg-gold-500 text-navy-900',
+  'gold-outline': 'border border-gold-500 text-gold-500 bg-transparent',
   success: 'bg-success/15 text-success',
   danger: 'bg-danger/15 text-danger',
   warning: 'bg-warning/15 text-warning',

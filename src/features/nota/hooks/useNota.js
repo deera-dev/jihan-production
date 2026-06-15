@@ -5,6 +5,8 @@ import {
   submitNotaUntukReview,
   approveNota,
   tolakNota,
+  hapusNota,
+  updateNota,
 } from '../api/notaRepository'
 
 export function useNotaByProduksi(produksiId) {
@@ -56,5 +58,21 @@ export function useTolakNota() {
       qc.invalidateQueries({ queryKey: ['nota'] })
       qc.invalidateQueries({ queryKey: ['kode'] })
     },
+  })
+}
+
+export function useHapusNota() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: hapusNota,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['nota'] }),
+  })
+}
+
+export function useUpdateNota() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ notaId, payload }) => updateNota(notaId, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['nota'] }),
   })
 }

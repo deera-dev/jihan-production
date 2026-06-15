@@ -45,7 +45,7 @@ export function NotifikasiPage() {
 
   return (
     <div className="bg-champagne-100">
-      <div className="bg-navy-900 px-4 py-5">
+      <div className="sticky top-0 z-30 bg-navy-900 px-4 py-5">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-heading text-heading text-champagne-100">NOTIFIKASI</h1>

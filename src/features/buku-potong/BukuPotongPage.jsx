@@ -1,181 +1,212 @@
-// JP-019 / JP-020 — Input Buku Potong Aktual.
-// Form input realisasi potong: yard terpakai per warna (primer) + pcs per warna per ukuran.
-// Setelah simpan → status kode ke input_nota.
+// JP-019 / JP-020 — Input Buku Potong Aktual (level produksi).
+// Yard terpakai per warna = 1 nilai untuk semua kode (1 gelaran).
+// PCS per ukuran dicatat per kode.
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useDetailKode } from '../kode/hooks/useKode'
-import { useAuthStore, selectProfile } from '../../store/useAuthStore'
-import { useBukuPotongMutations } from './hooks/useBukuPotong'
-import { formatRp } from '../../utils/formatRp'
+import { useProduksiBukuPotong, useBukuPotongMutations } from './hooks/useBukuPotong'
 
 export function BukuPotongPage() {
-  const { kodeId } = useParams()
+  const { produksiId } = useParams()
   const navigate = useNavigate()
-  const profile = useAuthStore(selectProfile)
-  const { data: kode, isLoading } = useDetailKode(kodeId)
-  const { simpanBukuPotong, isPending } = useBukuPotongMutations(kodeId)
+  const { data: produksi, isLoading } = useProduksiBukuPotong(produksiId)
+  const { simpanBukuPotong, isPending } = useBukuPotongMutations(produksiId)
 
-  // State: yard terpakai per warna primer
-  const [yardData, setYardData] = useState({})  // { warnaId: yardTerpakai }
-  // State: pcs per kode_ukuran_warna
-  const [pcsData, setPcsData] = useState({})    // { kodeUkuranWarnaId: jumlahPcs }
-  // State: warna baru yang mau ditambahkan (nama warna -> qty per ukuran)
-  const [warnaInput, setWarnaInput] = useState([])
+  // warnaRows: [{ bahanWarnaId, nama_warna, yardTerpakai }]
+  // pcsGrid: { `${kodeUkuranId}__${namaWarna}` : string }
+  const [warnaRows, setWarnaRows] = useState([])
+  const [pcsGrid, setPcsGrid] = useState({})
   const [errMsg, setErrMsg] = useState('')
 
-  const produksi = kode?.produksi
   const bahanPrimer = produksi?.produksi_bahan?.filter((b) => b.tipe_bahan === 'primer') ?? []
-  const ukuranList = [...(kode?.kode_ukuran ?? [])].sort((a, b) => a.urutan - b.urutan)
+  const kodeList = [...(produksi?.kode ?? [])].sort((a, b) =>
+    a.kode_desain.localeCompare(b.kode_desain)
+  )
 
-  // Pre-fill warnaInput dari warna yang sudah ada di primer
+  // Inisialisasi warnaRows dari warna unik di bahan primer
   useEffect(() => {
-    if (!kode || warnaInput.length > 0) return
-    const warnaSet = new Map()
-    for (const bahan of bahanPrimer) {
-      for (const w of bahan.produksi_bahan_warna ?? []) {
-        if (!warnaSet.has(w.nama_warna)) warnaSet.set(w.nama_warna, { id: w.id, yard: w.yard_tersedia ?? 0 })
+    if (!produksi || warnaRows.length > 0) return
+    const seen = new Map()
+    for (const b of bahanPrimer) {
+      for (const w of b.produksi_bahan_warna ?? []) {
+        if (!seen.has(w.nama_warna)) {
+          seen.set(w.nama_warna, {
+            bahanWarnaId: w.id,
+            nama_warna: w.nama_warna,
+            yardTerpakai: w.yard_terpakai ?? w.yard_tersedia ?? '',
+          })
+        }
       }
     }
-    setWarnaInput(Array.from(warnaSet.entries()).map(([nama, v]) => ({
-      nama_warna: nama,
-      bahanWarnaId: v.id,
-      yardTerpakai: v.yard ?? '',
-      pcsPerUkuran: Object.fromEntries(ukuranList.map((u) => [u.id, ''])),
-    })))
-  }, [kode])
+    setWarnaRows(Array.from(seen.values()))
+  }, [produksi])
 
-  function updateYard(idx, val) {
-    setWarnaInput((prev) => prev.map((w, i) => i === idx ? { ...w, yardTerpakai: val } : w))
+  function setYard(idx, val) {
+    setWarnaRows((prev) => prev.map((r, i) => i === idx ? { ...r, yardTerpakai: val } : r))
   }
 
-  function updatePcs(idx, ukuranId, val) {
-    setWarnaInput((prev) => prev.map((w, i) =>
-      i === idx ? { ...w, pcsPerUkuran: { ...w.pcsPerUkuran, [ukuranId]: val } } : w
-    ))
+  function setPcs(kodeUkuranId, namaWarna, val) {
+    setPcsGrid((prev) => ({ ...prev, [`${kodeUkuranId}__${namaWarna}`]: val }))
   }
 
   function tambahWarna() {
-    setWarnaInput((prev) => [
-      ...prev,
-      {
-        nama_warna: '',
-        bahanWarnaId: null,
-        yardTerpakai: '',
-        pcsPerUkuran: Object.fromEntries(ukuranList.map((u) => [u.id, ''])),
-      },
-    ])
+    setWarnaRows((prev) => [...prev, { bahanWarnaId: null, nama_warna: '', yardTerpakai: '' }])
   }
 
   function hapusWarna(idx) {
-    setWarnaInput((prev) => prev.filter((_, i) => i !== idx))
+    setWarnaRows((prev) => prev.filter((_, i) => i !== idx))
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setErrMsg('')
 
-    // Validasi minimal
-    for (const w of warnaInput) {
+    for (const w of warnaRows) {
       if (!w.nama_warna?.trim()) { setErrMsg('Nama warna tidak boleh kosong.'); return }
       if (!w.yardTerpakai || Number(w.yardTerpakai) <= 0) {
         setErrMsg(`Yard terpakai untuk warna ${w.nama_warna} harus > 0.`); return
       }
-      const totalPcs = Object.values(w.pcsPerUkuran).reduce((s, v) => s + (Number(v) || 0), 0)
-      if (totalPcs === 0) {
-        setErrMsg(`Total pcs untuk warna ${w.nama_warna} harus > 0.`); return
-      }
     }
 
+    // Bangun pcsPerKode: per warna, daftar { kodeUkuranId, jumlah_pcs }
+    const warnaData = warnaRows.map((w) => {
+      const pcsPerKode = []
+      for (const kode of kodeList) {
+        for (const uk of kode.kode_ukuran ?? []) {
+          pcsPerKode.push({
+            kodeUkuranId: uk.id,
+            jumlah_pcs: Number(pcsGrid[`${uk.id}__${w.nama_warna}`] || 0),
+          })
+        }
+      }
+      return {
+        bahanWarnaId: w.bahanWarnaId,
+        nama_warna: w.nama_warna.toUpperCase(),
+        yardTerpakai: Number(w.yardTerpakai),
+        pcsPerKode,
+      }
+    })
+
+    const kodeIds = kodeList.map((k) => k.id)
+
     try {
-      await simpanBukuPotong({
-        kodeId,
-        warnaData: warnaInput.map((w) => ({
-          nama_warna: w.nama_warna.toUpperCase(),
-          bahanWarnaId: w.bahanWarnaId,
-          yardTerpakai: Number(w.yardTerpakai),
-          pcsPerUkuran: Object.fromEntries(
-            Object.entries(w.pcsPerUkuran).map(([uid, v]) => [uid, Number(v) || 0])
-          ),
-        })),
-      })
-      navigate(`/kode/${kodeId}`)
+      await simpanBukuPotong({ produksiId, warnaData, kodeIds })
+      navigate(-1)
     } catch (err) {
       setErrMsg(err.message ?? 'Gagal menyimpan. Coba lagi.')
     }
   }
 
-  if (isLoading) return <div className="min-h-screen bg-champagne-100 flex items-center justify-center"><p className="font-sans text-body text-charcoal-300">MEMUAT...</p></div>
-
-  const totalPcsPerWarna = warnaInput.map((w) =>
-    Object.values(w.pcsPerUkuran).reduce((s, v) => s + (Number(v) || 0), 0)
+  if (isLoading) return (
+    <div className="min-h-screen bg-champagne-100 flex items-center justify-center">
+      <p className="font-sans text-body text-charcoal-300">MEMUAT...</p>
+    </div>
   )
 
+  if (!produksi) return (
+    <div className="min-h-screen bg-champagne-100 flex items-center justify-center">
+      <p className="font-sans text-body text-danger">Produksi tidak ditemukan.</p>
+    </div>
+  )
+
+  // Ringkasan total pcs per warna (semua kode)
+  const totalPerWarna = warnaRows.map((w) => {
+    let t = 0
+    for (const kode of kodeList)
+      for (const uk of kode.kode_ukuran ?? [])
+        t += Number(pcsGrid[`${uk.id}__${w.nama_warna}`] || 0)
+    return t
+  })
+
   return (
-    <div className="bg-champagne-100">
+    <div className="bg-champagne-100 min-h-screen pb-10">
       {/* Header */}
-      <div className="bg-navy-900 px-4 py-5">
+      <div className="sticky top-0 z-30 bg-navy-900 px-4 py-5">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="font-sans text-sm text-champagne-100 opacity-70">&#8592; KEMBALI</button>
+          <button onClick={() => navigate(-1)} className="font-sans text-sm text-champagne-100 opacity-70">
+            &#8592; KEMBALI
+          </button>
           <div>
             <h1 className="font-heading text-heading text-champagne-100">BUKU POTONG</h1>
-            <p className="font-sans text-label text-champagne-100 opacity-60">{kode?.kode_desain}</p>
+            <p className="font-sans text-label text-champagne-100 opacity-60">
+              {kodeList.map((k) => k.kode_desain).join(' · ')}
+            </p>
           </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="px-4 py-5 space-y-6">
-        {/* Ukuran header */}
-        <div className="rounded-xl bg-surface border border-border px-4 py-3">
-          <p className="font-sans text-label font-semibold text-charcoal-600 uppercase mb-1">Ukuran dalam kode ini</p>
-          <div className="flex flex-wrap gap-2">
-            {ukuranList.map((u) => (
-              <span key={u.id} className="rounded-full bg-navy-900 px-3 py-1 font-sans text-xs font-semibold text-champagne-100">
-                {u.ukuran}
-              </span>
+      <form onSubmit={handleSubmit} className="px-4 py-5 space-y-5">
+
+        {/* Kode yang terlibat */}
+        <div className="rounded-xl border border-border bg-surface px-4 py-3">
+          <p className="mb-2 font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-600">
+            KODE DALAM PRODUKSI INI
+          </p>
+          <div className="space-y-1">
+            {kodeList.map((k) => (
+              <div key={k.id} className="flex items-center gap-2 flex-wrap">
+                <span className="font-sans text-label font-semibold text-navy-900">{k.kode_desain}</span>
+                <span className="font-sans text-xs text-charcoal-300">
+                  {(k.kode_ukuran ?? []).map((u) => u.ukuran).join(', ')}
+                </span>
+              </div>
             ))}
           </div>
         </div>
 
-        {/* Input per warna */}
+        {/* Header kolom kode (untuk referensi grid PCS) */}
+        {kodeList.length > 1 && (
+          <div className="rounded-xl bg-navy-900/5 border border-border px-4 py-2.5 flex items-center gap-2 overflow-x-auto">
+            <span className="font-sans text-xs text-charcoal-300 shrink-0 w-20">WARNA \ KODE</span>
+            {kodeList.map((k) => (
+              <div key={k.id} className="shrink-0 text-center" style={{ minWidth: '80px' }}>
+                <p className="font-sans text-xs font-semibold text-navy-900">{k.kode_desain}</p>
+                <p className="font-sans text-[10px] text-charcoal-300">
+                  {(k.kode_ukuran ?? []).map((u) => u.ukuran).join('/')}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Data per warna */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="font-sans text-label font-semibold text-charcoal-600 uppercase">Data per Warna</p>
+            <p className="font-sans text-label font-semibold text-charcoal-600 uppercase">DATA PER WARNA</p>
             <button type="button" onClick={tambahWarna}
               className="rounded-lg border border-gold-500 px-3 py-1.5 font-sans text-xs font-semibold text-gold-500">
               + WARNA
             </button>
           </div>
 
-          {warnaInput.map((w, idx) => (
-            <WarnaInputCard
+          {warnaRows.map((w, idx) => (
+            <WarnaCard
               key={idx}
               warna={w}
-              ukuranList={ukuranList}
-              totalPcs={totalPcsPerWarna[idx]}
-              onUpdateNama={(v) => setWarnaInput((prev) => prev.map((x, i) => i === idx ? { ...x, nama_warna: v.toUpperCase() } : x))}
-              onUpdateYard={(v) => updateYard(idx, v)}
-              onUpdatePcs={(ukuranId, v) => updatePcs(idx, ukuranId, v)}
+              kodeList={kodeList}
+              pcsGrid={pcsGrid}
+              totalPcs={totalPerWarna[idx]}
+              onUpdateNama={(v) => setWarnaRows((p) => p.map((r, i) => i === idx ? { ...r, nama_warna: v.toUpperCase() } : r))}
+              onUpdateYard={(v) => setYard(idx, v)}
+              onUpdatePcs={setPcs}
               onHapus={() => hapusWarna(idx)}
             />
           ))}
         </div>
 
-        {/* Summary pcs total */}
-        {warnaInput.length > 0 && (
-          <div className="rounded-xl bg-navy-900 px-4 py-3">
-            <p className="font-sans text-label font-semibold text-champagne-100 uppercase mb-2">Ringkasan</p>
-            <div className="space-y-1">
-              {warnaInput.map((w, i) => (
-                <div key={i} className="flex justify-between font-sans text-label text-champagne-100">
-                  <span>{w.nama_warna || `Warna ${i + 1}`}</span>
-                  <span>{totalPcsPerWarna[i]} pcs | {w.yardTerpakai || 0} yard</span>
-                </div>
-              ))}
-              <div className="border-t border-white/20 pt-2 mt-2 flex justify-between font-sans text-body font-semibold text-gold-500">
-                <span>TOTAL PCS</span>
-                <span>{totalPcsPerWarna.reduce((s, v) => s + v, 0)}</span>
+        {/* Ringkasan */}
+        {warnaRows.length > 0 && (
+          <div className="rounded-xl bg-navy-900 px-4 py-3 space-y-1">
+            <p className="font-sans text-label font-semibold text-champagne-100 uppercase mb-2">RINGKASAN</p>
+            {warnaRows.map((w, i) => (
+              <div key={i} className="flex justify-between font-sans text-label text-champagne-100">
+                <span>{w.nama_warna || `Warna ${i + 1}`}</span>
+                <span>{totalPerWarna[i]} pcs · {w.yardTerpakai || 0} yard</span>
               </div>
+            ))}
+            <div className="border-t border-white/20 pt-2 mt-2 flex justify-between font-sans text-body font-semibold text-gold-500">
+              <span>TOTAL PCS</span>
+              <span>{totalPerWarna.reduce((s, v) => s + v, 0)}</span>
             </div>
           </div>
         )}
@@ -184,7 +215,7 @@ export function BukuPotongPage() {
           <p className="rounded-xl bg-danger/10 px-4 py-3 font-sans text-label text-danger">{errMsg}</p>
         )}
 
-        <button type="submit" disabled={isPending || warnaInput.length === 0}
+        <button type="submit" disabled={isPending || warnaRows.length === 0}
           className="w-full rounded-xl bg-gold-500 py-4 font-sans text-body font-semibold text-navy-900 disabled:opacity-50">
           {isPending ? 'MENYIMPAN...' : 'SIMPAN & LANJUTKAN'}
         </button>
@@ -193,51 +224,64 @@ export function BukuPotongPage() {
   )
 }
 
-function WarnaInputCard({ warna, ukuranList, totalPcs, onUpdateNama, onUpdateYard, onUpdatePcs, onHapus }) {
+function WarnaCard({ warna, kodeList, pcsGrid, totalPcs, onUpdateNama, onUpdateYard, onUpdatePcs, onHapus }) {
   return (
     <div className="rounded-xl bg-surface border border-border overflow-hidden">
+      {/* Header warna */}
       <div className="bg-champagne-200 px-4 py-3 flex items-center gap-2">
         <input
           value={warna.nama_warna}
           onChange={(e) => onUpdateNama(e.target.value)}
           placeholder="NAMA WARNA"
-          className="flex-1 bg-transparent font-sans text-label font-semibold text-navy-900 uppercase outline-none placeholder:text-charcoal-300"
+          className="flex-1 min-w-0 bg-transparent font-sans text-label font-semibold text-navy-900 uppercase outline-none placeholder:text-charcoal-300"
         />
-        <button type="button" onClick={onHapus} className="font-sans text-xs text-danger">HAPUS</button>
+        <button type="button" onClick={onHapus}
+          className="shrink-0 font-sans text-xs text-danger">HAPUS</button>
       </div>
 
-      <div className="px-4 py-3 space-y-3">
-        {/* Yard terpakai */}
+      <div className="px-4 py-3 space-y-4">
+        {/* Yard terpakai — 1 nilai untuk semua kode */}
         <div className="flex items-center gap-3">
-          <label className="font-sans text-label text-charcoal-600 w-28">Yard terpakai</label>
+          <label className="font-sans text-label text-charcoal-600 shrink-0">Yard terpakai</label>
           <input
             type="number"
             min={0}
             step={0.01}
             value={warna.yardTerpakai}
             onChange={(e) => onUpdateYard(e.target.value)}
-            className="flex-1 rounded-lg border border-border px-3 py-2 font-sans text-label text-navy-900 outline-none focus:border-gold-500"
+            className="flex-1 min-w-0 rounded-lg border border-border px-3 py-2 font-sans text-label text-navy-900 outline-none focus:border-gold-500"
+            placeholder="0"
           />
-          <span className="font-sans text-label text-charcoal-300">yard</span>
+          <span className="font-sans text-label text-charcoal-300 shrink-0">yard</span>
         </div>
 
-        {/* Pcs per ukuran */}
+        {/* PCS per kode per ukuran */}
         <div>
-          <p className="font-sans text-xs text-charcoal-300 uppercase mb-2">Pcs per ukuran</p>
-          <div className="grid grid-cols-2 gap-2">
-            {ukuranList.map((u) => (
-              <div key={u.id} className="flex items-center gap-2">
-                <label className="font-sans text-xs text-charcoal-600 w-20">{u.ukuran}</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={warna.pcsPerUkuran[u.id] ?? ''}
-                  onChange={(e) => onUpdatePcs(u.id, e.target.value)}
-                  className="flex-1 rounded-lg border border-border px-2 py-1.5 font-sans text-label text-navy-900 outline-none focus:border-gold-500 text-center"
-                  placeholder="0"
-                />
-              </div>
-            ))}
+          <p className="font-sans text-xs text-charcoal-300 uppercase mb-2">PCS PER KODE</p>
+          <div className="space-y-3">
+            {kodeList.map((kode) => {
+              const ukuranList = [...(kode.kode_ukuran ?? [])].sort((a, b) => a.urutan - b.urutan)
+              return (
+                <div key={kode.id}>
+                  <p className="font-sans text-xs font-semibold text-navy-900 mb-1.5">{kode.kode_desain}</p>
+                  <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(ukuranList.length, 2)}, 1fr)` }}>
+                    {ukuranList.map((uk) => (
+                      <div key={uk.id} className="flex items-center gap-2">
+                        <label className="font-sans text-xs text-charcoal-600 w-24 shrink-0">{uk.ukuran}</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={pcsGrid[`${uk.id}__${warna.nama_warna}`] ?? ''}
+                          onChange={(e) => onUpdatePcs(uk.id, warna.nama_warna, e.target.value)}
+                          className="flex-1 min-w-0 rounded-lg border border-border px-2 py-1.5 font-sans text-label text-navy-900 outline-none focus:border-gold-500 text-center"
+                          placeholder="0"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
           <p className="mt-2 font-sans text-xs text-charcoal-300 text-right">Total: {totalPcs} pcs</p>
         </div>

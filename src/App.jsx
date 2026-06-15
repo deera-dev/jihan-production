@@ -53,7 +53,7 @@ export function App() {
             <Route path="/nota" element={<NotaListPage />} />
             <Route path="/produksi/buat" element={<BuatProduksiPage />} />
             <Route path="/kode/baru" element={<BuatKodePage />} />
-            <Route path="/kode/:kodeId/buku-potong" element={<BukuPotongPage />} />
+            <Route path="/produksi/:produksiId/buku-potong" element={<BukuPotongPage />} />
             <Route path="/pengaturan/pengguna" element={<KelolaPenggunaPage />} />
             <Route path="/pengaturan/activity-log" element={<ActivityLogPage />} />
             <Route path="/pengaturan/data-terhapus" element={<DataTerhapusPage />} />

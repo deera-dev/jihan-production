@@ -25,7 +25,14 @@ export async function ambilSemuaProduksi() {
         id,
         kode_desain,
         status,
-        urutan
+        urutan,
+        kode_ukuran (
+          ukuran,
+          kode_ukuran_warna (
+            nama_warna,
+            jumlah_pcs
+          )
+        )
       )
     `)
     .is('deleted_at', null)

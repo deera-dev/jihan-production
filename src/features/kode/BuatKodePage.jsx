@@ -136,7 +136,7 @@ export function BuatKodePage() {
 
       {/* Header */}
 
-      <div className="flex items-center gap-3 bg-navy-900 px-4 py-5">
+      <div className="sticky top-0 z-30 flex items-center gap-3 bg-navy-900 px-4 py-5">
 
         <button
 

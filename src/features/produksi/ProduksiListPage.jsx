@@ -33,7 +33,7 @@ export function ProduksiListPage() {
 
   return (
     <div className="bg-champagne-100">
-      <div className="flex items-center justify-between bg-navy-900 px-4 py-5">
+      <div className="sticky top-0 z-30 flex items-center justify-between bg-navy-900 px-4 py-5">
         <h1 className="font-heading text-heading text-champagne-100">PRODUKSI</h1>
         {isDeera && (
           <button
@@ -102,15 +102,34 @@ export function ProduksiListPage() {
   )
 }
 
+function hitungInfoKode(kode) {
+  const ukuranList = kode.kode_ukuran ?? []
+  let totalPcs = 0
+  const warnaSet = new Set()
+  ukuranList.forEach((u) => {
+    (u.kode_ukuran_warna ?? []).forEach((w) => {
+      totalPcs += w.jumlah_pcs || 0
+      if (w.nama_warna) warnaSet.add(w.nama_warna)
+    })
+  })
+  return {
+    totalPcs,
+    warnaList: [...warnaSet],
+    ukuranList: ukuranList.map((u) => u.ukuran).filter(Boolean),
+  }
+}
+
 function ProduksiCard({ produksi, onClick }) {
   const kode = produksi.kode ?? []
   const sortedKode = [...kode].sort((a, b) => a.urutan - b.urutan)
+  const totalSemuaPcs = sortedKode.reduce((s, k) => s + hitungInfoKode(k).totalPcs, 0)
 
   return (
     <button
       onClick={onClick}
       className="w-full rounded-xl bg-surface border border-border px-4 py-4 text-left"
     >
+      {/* Header batch */}
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="font-sans text-body font-semibold text-navy-900">
@@ -120,17 +139,43 @@ function ProduksiCard({ produksi, onClick }) {
             {formatTanggal(produksi.tanggal)}
           </p>
         </div>
-        <p className="font-sans text-label text-charcoal-300">{kode.length} kode</p>
+        <div className="text-right">
+          <p className="font-sans text-label text-charcoal-300">{kode.length} kode</p>
+          {totalSemuaPcs > 0 && (
+            <p className="font-sans text-label font-semibold text-navy-900">
+              {totalSemuaPcs.toLocaleString('id-ID')} pcs
+            </p>
+          )}
+        </div>
       </div>
 
+      {/* Detail per kode */}
       {sortedKode.length > 0 && (
-        <div className="mt-3 border-t border-border pt-3 space-y-2">
-          {sortedKode.map((k) => (
-            <div key={k.id} className="flex items-center justify-between gap-2">
-              <span className="font-sans text-label font-semibold text-navy-900">{k.kode_desain}</span>
-              <StatusBadge status={k.status} />
-            </div>
-          ))}
+        <div className="mt-3 border-t border-border pt-3 space-y-3">
+          {sortedKode.map((k) => {
+            const info = hitungInfoKode(k)
+            return (
+              <div key={k.id}>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="font-sans text-label font-semibold text-navy-900">{k.kode_desain}</span>
+                  <StatusBadge status={k.status} />
+                </div>
+                {info.totalPcs > 0 && (
+                  <div className="space-y-0.5">
+                    <p className="font-sans text-xs text-charcoal-300">
+                      {info.totalPcs} pcs
+                      {info.ukuranList.length > 0 && ` · ${info.ukuranList.join(', ')}`}
+                    </p>
+                    {info.warnaList.length > 0 && (
+                      <p className="font-sans text-xs text-charcoal-300">
+                        {info.warnaList.join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </button>

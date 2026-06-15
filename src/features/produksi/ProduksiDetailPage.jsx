@@ -2,12 +2,65 @@
 
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useDetailProduksi, useUpdateProduksi, useHapusProduksi } from './hooks/useProduksi'
+import {
+  useDetailProduksi,
+  useUpdateProduksi,
+  useHapusProduksi,
+  useUpdateBahan,
+  useHapusBahan,
+  useTambahWarnaBahan,
+  useUpdateWarnaBahan,
+  useHapusWarnaBahan,
+} from './hooks/useProduksi'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { ProduksiBar } from '../../components/shared/ProduksiBar'
 import { useAuthStore, selectIsDeera } from '../../store/useAuthStore'
 import { formatTanggal } from '../../utils/formatTanggal'
 import { formatRp } from '../../utils/formatRp'
+
+// Mini 4-step stepper berdasarkan kode.status (bukan tracking pcs)
+const KODE_STATUS_STEP = {
+  sampel_dibuat: 0, review_sampel: 0, estimasi_pemakaian: 0, konfirmasi_pemakaian: 0,
+  proses_potong: 1, input_buku_potong: 1, input_nota: 1, review_hpp: 1, input_hpp: 1, hpp_ditolak: 1,
+  produksi: 2, siap_kirim: 2,
+  selesai: 3,
+}
+const KODE_STEP_LABELS = ['SAMPEL', 'POTONG', 'PRODUKSI', 'SELESAI']
+
+function KodeStatusMini({ status }) {
+  const activeIdx = KODE_STATUS_STEP[status] ?? 0
+  const n = KODE_STEP_LABELS.length
+  const edgePct = 50 / n
+  const activeWidth = activeIdx > 0 ? ((activeIdx / (n - 1)) * (100 - 100 / n)) + '%' : '0%'
+  return (
+    <div className="relative flex items-start w-full pt-2 pb-0.5">
+      <div className="absolute h-px bg-champagne-200" style={{ top: '10px', left: edgePct + '%', right: edgePct + '%' }} />
+      <div className="absolute h-px bg-gold-500" style={{ top: '10px', left: edgePct + '%', width: activeWidth }} />
+      {KODE_STEP_LABELS.map((label, i) => {
+        const done = i < activeIdx
+        const active = i === activeIdx
+        return (
+          <div key={label} className="flex-1 flex flex-col items-center gap-0.5 relative z-10">
+            <div className={[
+              'h-5 w-5 rounded-full flex items-center justify-center font-sans text-[9px] font-bold',
+              done ? 'bg-gold-500 text-navy-900'
+                   : active ? 'border-2 border-gold-500 bg-white text-gold-500'
+                            : 'bg-champagne-200 text-charcoal-300',
+            ].join(' ')}>
+              {done ? '\u2713' : i + 1}
+            </div>
+            <span className={[
+              'font-sans text-[7px] whitespace-nowrap',
+              active ? 'text-gold-500 font-semibold' : done ? 'text-gold-500/60' : 'text-charcoal-300',
+            ].join(' ')}>
+              {label}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 export function ProduksiDetailPage() {
   const { produksiId } = useParams()
@@ -66,7 +119,7 @@ export function ProduksiDetailPage() {
   return (
     <div className="bg-champagne-100">
       {/* Header */}
-      <div className="flex items-center gap-3 bg-navy-900 px-4 py-5">
+      <div className="sticky top-0 z-30 flex items-center gap-3 bg-navy-900 px-4 py-5">
         <button onClick={() => navigate(-1)} className="font-sans text-body text-champagne-100">&#8592;</button>
         <div className="flex-1">
           <h1 className="font-heading text-heading text-champagne-100">BATCH {produksi.kode_bahan}</h1>
@@ -113,7 +166,7 @@ export function ProduksiDetailPage() {
                     <StatusBadge status={k.status} />
                   </div>
                   <div className="mt-3">
-                    <ProduksiBar kodeId={k.id} mini />
+                    <KodeStatusMini status={k.status} />
                   </div>
                 </button>
               ))}
@@ -153,7 +206,14 @@ export function ProduksiDetailPage() {
               BAHAN PRIMER (MOTIF)
             </p>
             <div className="space-y-3">
-              {bahanPrimer.map((b) => <BahanCard key={b.id} bahan={b} />)}
+              {bahanPrimer.map((b) => (
+                <BahanPrimerCard
+                  key={b.id}
+                  bahan={b}
+                  isDeera={isDeera}
+                  produksiId={produksiId}
+                />
+              ))}
             </div>
           </section>
         )}
@@ -196,7 +256,7 @@ export function ProduksiDetailPage() {
         )}
       </div>
 
-      {/* Modal Edit */}
+      {/* Modal Edit Produksi */}
       {modalEdit && (
         <div className="fixed inset-0 z-[60] flex items-end bg-black/60">
           <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
@@ -234,7 +294,7 @@ export function ProduksiDetailPage() {
         </div>
       )}
 
-      {/* Modal Hapus */}
+      {/* Modal Hapus Produksi */}
       {modalHapus && (
         <div className="fixed inset-0 z-[60] flex items-end bg-black/60">
           <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
@@ -259,10 +319,270 @@ export function ProduksiDetailPage() {
   )
 }
 
-function BahanCard({ bahan }) {
+// ─── Bahan Primer Card (dengan edit & hapus) ─────────────────────────────────
+
+function BahanPrimerCard({ bahan, isDeera, produksiId }) {
   const warna = [...(bahan.produksi_bahan_warna ?? [])].sort((a, b) => a.urutan - b.urutan)
   const totalYard = warna.reduce((s, w) => s + (w.yard_tersedia ?? 0), 0)
 
+  const updateBahanMut = useUpdateBahan(produksiId)
+  const hapusBahanMut = useHapusBahan(produksiId)
+  const tambahWarnaMut = useTambahWarnaBahan(produksiId)
+  const updateWarnaMut = useUpdateWarnaBahan(produksiId)
+  const hapusWarnaMut = useHapusWarnaBahan(produksiId)
+
+  const [mode, setMode] = useState('view') // 'view' | 'edit'
+  const [modalHapusBahan, setModalHapusBahan] = useState(false)
+  const [editBahan, setEditBahan] = useState({ jenis_bahan: '', harga_per_satuan: '' })
+  const [editWarna, setEditWarna] = useState([]) // [{ id?, nama_warna, yard_tersedia, _new?, _del? }]
+  const [warnaInput, setWarnaInput] = useState({ nama_warna: '', yard_tersedia: '' })
+
+  function bukaEdit() {
+    setEditBahan({
+      jenis_bahan: bahan.jenis_bahan ?? '',
+      harga_per_satuan: bahan.harga_per_satuan ?? '',
+    })
+    setEditWarna(warna.map((w) => ({ ...w })))
+    setMode('edit')
+  }
+
+  function tutupEdit() {
+    setMode('view')
+    setWarnaInput({ nama_warna: '', yard_tersedia: '' })
+  }
+
+  function tambahWarnaLokal() {
+    if (!warnaInput.nama_warna.trim()) return
+    setEditWarna((prev) => [
+      ...prev,
+      {
+        _new: true,
+        nama_warna: warnaInput.nama_warna.toUpperCase(),
+        yard_tersedia: parseFloat(warnaInput.yard_tersedia) || 0,
+      },
+    ])
+    setWarnaInput({ nama_warna: '', yard_tersedia: '' })
+  }
+
+  function hapusWarnaLokal(idx) {
+    setEditWarna((prev) =>
+      prev[idx]._new
+        ? prev.filter((_, i) => i !== idx)
+        : prev.map((w, i) => (i === idx ? { ...w, _del: true } : w))
+    )
+  }
+
+  async function simpanEdit() {
+    await updateBahanMut.mutateAsync({
+      id: bahan.id,
+      perubahan: {
+        jenis_bahan: editBahan.jenis_bahan.toUpperCase(),
+        harga_per_satuan: parseFloat(editBahan.harga_per_satuan) || 0,
+      },
+    })
+    for (const w of editWarna) {
+      if (w._new) {
+        await tambahWarnaMut.mutateAsync({
+          produksi_bahan_id: bahan.id,
+          nama_warna: w.nama_warna,
+          yard_tersedia: w.yard_tersedia,
+        })
+      } else if (w._del) {
+        await hapusWarnaMut.mutateAsync(w.id)
+      } else {
+        const orig = warna.find((x) => x.id === w.id)
+        if (orig && (orig.nama_warna !== w.nama_warna || orig.yard_tersedia !== w.yard_tersedia)) {
+          await updateWarnaMut.mutateAsync({
+            id: w.id,
+            perubahan: {
+              nama_warna: w.nama_warna.toUpperCase(),
+              yard_tersedia: parseFloat(w.yard_tersedia) || 0,
+            },
+          })
+        }
+      }
+    }
+    tutupEdit()
+  }
+
+  async function konfirmasiHapusBahan() {
+    await hapusBahanMut.mutateAsync(bahan.id)
+    setModalHapusBahan(false)
+  }
+
+  const isSaving =
+    updateBahanMut.isPending ||
+    tambahWarnaMut.isPending ||
+    updateWarnaMut.isPending ||
+    hapusWarnaMut.isPending
+
+  if (mode === 'edit') {
+    return (
+      <div className="rounded-xl bg-surface border border-gold-500 px-4 py-4 space-y-4">
+        <div className="space-y-1">
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Jenis Bahan</label>
+          <input
+            type="text"
+            value={editBahan.jenis_bahan}
+            onChange={(e) => setEditBahan((p) => ({ ...p, jenis_bahan: e.target.value.toUpperCase() }))}
+            className="w-full rounded-xl border border-border px-3 py-2.5 font-sans text-body text-navy-900 uppercase outline-none focus:border-gold-500"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Harga / Yard (Rp)</label>
+          <input
+            type="number"
+            value={editBahan.harga_per_satuan}
+            onChange={(e) => setEditBahan((p) => ({ ...p, harga_per_satuan: e.target.value }))}
+            className="w-full rounded-xl border border-border px-3 py-2.5 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Warna</label>
+          {editWarna.filter((w) => !w._del).map((w, idx) => {
+            const realIdx = editWarna.indexOf(w)
+            return (
+              <div key={idx} className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={w.nama_warna}
+                  onChange={(e) =>
+                    setEditWarna((prev) =>
+                      prev.map((x, i) => (i === realIdx ? { ...x, nama_warna: e.target.value.toUpperCase() } : x))
+                    )
+                  }
+                  placeholder="NAMA WARNA"
+                  className="flex-1 min-w-0 rounded-xl border border-border px-3 py-2 font-sans text-label text-navy-900 uppercase outline-none focus:border-gold-500"
+                />
+                <input
+                  type="number"
+                  value={w.yard_tersedia}
+                  onChange={(e) =>
+                    setEditWarna((prev) =>
+                      prev.map((x, i) => (i === realIdx ? { ...x, yard_tersedia: e.target.value } : x))
+                    )
+                  }
+                  placeholder="yd"
+                  className="w-14 rounded-xl border border-border px-2 py-2 font-sans text-label text-navy-900 outline-none focus:border-gold-500 text-center"
+                />
+                <button
+                  onClick={() => hapusWarnaLokal(realIdx)}
+                  className="shrink-0 w-6 font-sans text-sm font-semibold text-danger leading-none"
+                >
+                  ×
+                </button>
+              </div>
+            )
+          })}
+          <div className="flex items-center gap-1.5 pt-1">
+            <input
+              type="text"
+              value={warnaInput.nama_warna}
+              onChange={(e) => setWarnaInput((p) => ({ ...p, nama_warna: e.target.value.toUpperCase() }))}
+              placeholder="WARNA BARU"
+              className="flex-1 min-w-0 rounded-xl border border-border bg-champagne-100 px-3 py-2 font-sans text-label text-navy-900 uppercase outline-none focus:border-gold-500"
+            />
+            <input
+              type="number"
+              value={warnaInput.yard_tersedia}
+              onChange={(e) => setWarnaInput((p) => ({ ...p, yard_tersedia: e.target.value }))}
+              placeholder="yd"
+              className="w-14 rounded-xl border border-border bg-champagne-100 px-2 py-2 font-sans text-label text-navy-900 outline-none focus:border-gold-500 text-center"
+            />
+            <button
+              onClick={tambahWarnaLokal}
+              className="shrink-0 rounded-lg bg-champagne-200 px-2.5 py-2 font-sans text-xs font-semibold text-navy-900"
+            >
+              +
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={() => setModalHapusBahan(true)}
+            className="rounded-xl border border-danger px-4 py-2.5 font-sans text-label font-semibold text-danger"
+          >
+            HAPUS
+          </button>
+          <button onClick={tutupEdit}
+            className="flex-1 rounded-xl border border-border py-2.5 font-sans text-label font-semibold text-charcoal-600">
+            BATAL
+          </button>
+          <button onClick={simpanEdit} disabled={isSaving}
+            className="flex-1 rounded-xl bg-gold-500 py-2.5 font-sans text-label font-semibold text-navy-900 disabled:opacity-50">
+            {isSaving ? 'MENYIMPAN...' : 'SIMPAN'}
+          </button>
+        </div>
+        {modalHapusBahan && (
+          <div className="fixed inset-0 z-[70] flex items-end bg-black/60">
+            <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
+              <p className="font-heading text-heading text-navy-900">HAPUS BAHAN</p>
+              <p className="font-sans text-body text-charcoal-600">
+                Hapus bahan <span className="font-semibold text-navy-900">{bahan.jenis_bahan}</span> beserta semua data warna-nya?
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setModalHapusBahan(false)}
+                  className="flex-1 rounded-xl border border-border py-3.5 font-sans text-body font-semibold text-charcoal-600">
+                  BATAL
+                </button>
+                <button onClick={konfirmasiHapusBahan} disabled={hapusBahanMut.isPending}
+                  className="flex-1 rounded-xl bg-danger py-3.5 font-sans text-body font-semibold text-white disabled:opacity-50">
+                  {hapusBahanMut.isPending ? 'MENGHAPUS...' : 'HAPUS'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl bg-surface border border-border px-4 py-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-sans text-body font-semibold text-navy-900">{bahan.jenis_bahan}</p>
+          <p className="mt-0.5 font-sans text-label text-charcoal-600">
+            {formatRp(bahan.harga_per_satuan)} / yard
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="rounded-full bg-champagne-200 px-2.5 py-0.5 font-sans text-xs text-charcoal-600">YARD</span>
+          {isDeera && (
+            <button
+              onClick={bukaEdit}
+              className="rounded-lg border border-border px-2.5 py-1 font-sans text-xs font-semibold text-charcoal-600"
+            >
+              EDIT
+            </button>
+          )}
+        </div>
+      </div>
+      {warna.length > 0 && (
+        <div className="mt-3 border-t border-border pt-3 space-y-1.5">
+          {warna.map((w) => (
+            <div key={w.id} className="flex items-center justify-between gap-2">
+              <span className="font-sans text-label text-navy-900">{w.nama_warna}</span>
+              <span className="font-sans text-label text-charcoal-600">
+                {w.yard_tersedia ? w.yard_tersedia + ' yard' : '—'}
+              </span>
+            </div>
+          ))}
+          {warna.length > 1 && (
+            <div className="flex items-center justify-between gap-2 border-t border-border pt-1.5">
+              <span className="font-sans text-label font-semibold text-charcoal-300">TOTAL</span>
+              <span className="font-sans text-label font-semibold text-navy-900">{totalYard} yard</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BahanCard({ bahan }) {
+  const warna = [...(bahan.produksi_bahan_warna ?? [])].sort((a, b) => a.urutan - b.urutan)
+  const totalYard = warna.reduce((s, w) => s + (w.yard_tersedia ?? 0), 0)
   return (
     <div className="rounded-xl bg-surface border border-border px-4 py-3">
       <div className="flex items-start justify-between gap-2">
@@ -273,7 +593,7 @@ function BahanCard({ bahan }) {
       </div>
       <p className="mt-0.5 font-sans text-label text-charcoal-600">
         {formatRp(bahan.harga_per_satuan)} / {bahan.satuan}
-        {bahan.jumlah_dibeli ? ` · ${bahan.jumlah_dibeli} ${bahan.satuan} diterima` : ''}
+        {bahan.jumlah_dibeli ? ' · ' + bahan.jumlah_dibeli + ' ' + bahan.satuan + ' diterima' : ''}
       </p>
       {warna.length > 0 && (
         <div className="mt-3 border-t border-border pt-3 space-y-1.5">
@@ -281,7 +601,7 @@ function BahanCard({ bahan }) {
             <div key={w.id} className="flex items-center justify-between gap-2">
               <span className="font-sans text-label text-navy-900">{w.nama_warna}</span>
               <span className="font-sans text-label text-charcoal-600">
-                {w.yard_tersedia ? `${w.yard_tersedia} yard` : '—'}
+                {w.yard_tersedia ? w.yard_tersedia + ' yard' : '—'}
               </span>
             </div>
           ))}
