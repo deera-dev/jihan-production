@@ -5,7 +5,6 @@ import { z } from 'zod'
 export const UKURAN_OPTIONS = ['MIDI', 'GAMIS', 'MIDI JUMBO', 'GAMIS JUMBO']
 
 export const buatKodeSchema = z.object({
-  // kode_desain dirakit otomatis dari 3 field ini → J-{nomor}-{kode_bahan}
   nomor: z
     .string()
     .regex(/^\d{3}$/, 'Nomor harus 3 digit, contoh: 001'),

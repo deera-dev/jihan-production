@@ -65,7 +65,7 @@ export function DashboardPage() {
               {formatRp(saldoKasbon)}
             </p>
           </div>
-          <span className="font-sans text-label text-charcoal-300">›</span>
+          <span className="font-sans text-label text-charcoal-300">&#8250;</span>
         </button>
       )}
 
@@ -142,7 +142,7 @@ function AksiCard({ kode, isDeera, onClick }) {
         </div>
         <p className="font-sans text-xs text-charcoal-300 uppercase">{aksiLabel(kode.status, isDeera)}</p>
       </div>
-      <span className="shrink-0 text-gold-500 font-sans text-body">›</span>
+      <span className="shrink-0 text-gold-500 font-sans text-body">&#8250;</span>
     </button>
   )
 }
@@ -175,7 +175,7 @@ function KodeMiniCard({ kode, onClick }) {
         <p className="font-sans text-label font-semibold text-navy-900">{kode.kode_desain}</p>
         <StatusBadge status={kode.status} />
       </div>
-      <span className="text-charcoal-300 font-sans text-body">›</span>
+      <span className="text-charcoal-300 font-sans text-body">&#8250;</span>
     </button>
   )
 }

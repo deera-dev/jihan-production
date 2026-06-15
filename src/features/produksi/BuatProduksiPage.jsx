@@ -10,7 +10,6 @@ import { useAuthStore } from '../../store/useAuthStore'
 import { useBuatProduksi, useBuatSuratJalan, useTambahBahan, useTambahWarnaBahan } from './hooks/useProduksi'
 import { NumberInput } from '../../components/ui/NumberInput'
 
-// Gabungkan semua schema dalam satu form
 const formSchema = z.object({
   kode_bahan: z
     .string()
@@ -19,14 +18,10 @@ const formSchema = z.object({
     .regex(/^[A-Za-z]+$/, 'Hanya huruf, contoh: IMA'),
   tanggal: z.string().min(1, 'Tanggal wajib diisi'),
   catatan: z.string().optional(),
-
-  // Surat jalan (opsional)
   nomor_surat_jalan: z.string().optional(),
   tanggal_terima: z.string().optional(),
   pengirim: z.string().optional(),
   catatan_sj: z.string().optional(),
-
-  // Bahan (array)
   bahan: z.array(
     z.object({
       jenis_bahan: z.string().min(1, 'Wajib diisi'),
@@ -88,12 +83,9 @@ export function BuatProduksiPage() {
     name: 'bahan',
   })
 
-  const tipeBahan = watch(bahanFields.map((_, i) => `bahan.${i}.tipe_bahan`))
-
   async function onSubmit(values) {
     setErrorServer(null)
     try {
-      // 1. Buat produksi
       const produksi = await buatProduksi({
         kode_bahan: values.kode_bahan.toUpperCase(),
         tanggal: values.tanggal,
@@ -101,7 +93,6 @@ export function BuatProduksiPage() {
         created_by: user.id,
       })
 
-      // 2. Buat surat jalan (jika tanggal_terima diisi)
       let suratJalanId = null
       if (values.tanggal_terima) {
         const sj = await buatSuratJalan({
@@ -115,7 +106,6 @@ export function BuatProduksiPage() {
         suratJalanId = sj.id
       }
 
-      // 3. Tambah bahan + warna satu per satu
       for (let i = 0; i < (values.bahan ?? []).length; i++) {
         const b = values.bahan[i]
         const bahan = await tambahBahan({
@@ -154,15 +144,13 @@ export function BuatProduksiPage() {
 
   return (
     <div className="min-h-screen bg-champagne-100">
-      {/* Header */}
       <div className="flex items-center gap-3 bg-navy-900 px-4 py-5">
-        <button onClick={() => navigate(-1)} className="font-sans text-body text-champagne-100">←</button>
+        <button onClick={() => navigate(-1)} className="font-sans text-body text-champagne-100">&#8592;</button>
         <h1 className="font-heading text-heading text-champagne-100">BUAT PRODUKSI</h1>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="px-4 py-5 space-y-6" noValidate>
 
-        {/* ── Info Produksi ── */}
         <section>
           <p className="mb-3 font-sans text-label font-semibold text-charcoal-300 uppercase tracking-widest">INFO PRODUKSI</p>
           <div className="rounded-xl bg-surface border border-border p-4 space-y-4">
@@ -205,7 +193,6 @@ export function BuatProduksiPage() {
           </div>
         </section>
 
-        {/* ── Surat Jalan ── */}
         <section>
           <p className="mb-3 font-sans text-label font-semibold text-charcoal-300 uppercase tracking-widest">SURAT JALAN</p>
           <div className="rounded-xl bg-surface border border-border p-4 space-y-4">
@@ -239,7 +226,6 @@ export function BuatProduksiPage() {
           </div>
         </section>
 
-        {/* ── Bahan dari Jihan ── */}
         <section>
           <div className="mb-3 flex items-center justify-between">
             <p className="font-sans text-label font-semibold text-charcoal-300 uppercase tracking-widest">BAHAN DARI JIHAN</p>
@@ -291,8 +277,6 @@ export function BuatProduksiPage() {
   )
 }
 
-// ─── Sub-komponen BahanItem ───────────────────────────────────────────────────
-
 function BahanItem({ index, tipe, register, control, errors, watch, onHapus }) {
   const { fields: warnaFields, append: appendWarna, remove: removeWarna } = useFieldArray({
     control,
@@ -310,7 +294,6 @@ function BahanItem({ index, tipe, register, control, errors, watch, onHapus }) {
         )}
       </div>
 
-      {/* Jenis bahan */}
       <div>
         <label className="mb-1 block font-sans text-label text-charcoal-600">JENIS BAHAN *</label>
         <input
@@ -325,7 +308,6 @@ function BahanItem({ index, tipe, register, control, errors, watch, onHapus }) {
         {errors?.jenis_bahan && <p className="mt-1 font-sans text-label text-danger">{errors.jenis_bahan.message}</p>}
       </div>
 
-      {/* Tipe bahan */}
       <div>
         <label className="mb-2 block font-sans text-label text-charcoal-600">TIPE BAHAN *</label>
         <div className="flex gap-3">
@@ -338,7 +320,6 @@ function BahanItem({ index, tipe, register, control, errors, watch, onHapus }) {
         </div>
       </div>
 
-      {/* Satuan */}
       <div>
         <label className="mb-2 block font-sans text-label text-charcoal-600">SATUAN *</label>
         <div className="flex gap-3">
@@ -351,7 +332,6 @@ function BahanItem({ index, tipe, register, control, errors, watch, onHapus }) {
         </div>
       </div>
 
-      {/* Harga per satuan */}
       <div>
         <label className="mb-1 block font-sans text-label text-charcoal-600">
           HARGA PER {watch(`bahan.${index}.satuan`)?.toUpperCase() ?? 'SATUAN'} (Rp) *
@@ -372,28 +352,28 @@ function BahanItem({ index, tipe, register, control, errors, watch, onHapus }) {
         {errors?.harga_per_satuan && <p className="mt-1 font-sans text-label text-danger">{errors.harga_per_satuan.message}</p>}
       </div>
 
-      {/* Jumlah dibeli */}
-      <div>
-        <label className="mb-1 block font-sans text-label text-charcoal-600">
-          JUMLAH DITERIMA ({watch(`bahan.${index}.satuan`)?.toUpperCase() ?? 'SATUAN'})
-        </label>
-        <Controller
-          control={control}
-          name={`bahan.${index}.jumlah_dibeli`}
-          render={({ field }) => (
-            <NumberInput
-              value={field.value}
-              onChange={field.onChange}
-              min={0}
-              max={9999}
-              step={0.5}
-              decimal
-            />
-          )}
-        />
-      </div>
+      {tipe === 'sekunder' && (
+        <div>
+          <label className="mb-1 block font-sans text-label text-charcoal-600">
+            JUMLAH DITERIMA ({watch(`bahan.${index}.satuan`)?.toUpperCase() ?? 'SATUAN'})
+          </label>
+          <Controller
+            control={control}
+            name={`bahan.${index}.jumlah_dibeli`}
+            render={({ field }) => (
+              <NumberInput
+                value={field.value}
+                onChange={field.onChange}
+                min={0}
+                max={9999}
+                step={0.5}
+                decimal
+              />
+            )}
+          />
+        </div>
+      )}
 
-      {/* Warna — hanya untuk bahan primer */}
       {tipe === 'primer' && (
         <div>
           <div className="mb-2 flex items-center justify-between">
@@ -441,7 +421,7 @@ function BahanItem({ index, tipe, register, control, errors, watch, onHapus }) {
                     onClick={() => removeWarna(j)}
                     className="mt-2.5 font-sans text-label text-danger"
                   >
-                    ✕
+                    &#10005;
                   </button>
                 )}
               </div>

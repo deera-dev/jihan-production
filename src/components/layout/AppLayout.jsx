@@ -1,11 +1,4 @@
 // App shell: bottom navigation + content area.
-// Dipakai sebagai wrapper semua halaman authenticated lewat <Outlet />.
-// Bottom nav berbeda per role efektif:
-//   Deera / Master-as-Deera : Beranda | Produksi | HPP/Nota | Atur
-//   Jihan / Master-as-Jihan : Beranda | Produksi | Notifikasi | Akun
-//
-// Master mendapat floating pill di pojok kanan atas untuk toggle view.
-
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   useAuthStore,
@@ -18,7 +11,7 @@ import { useNotifikasi } from '../../features/notifikasi'
 const navDeera = [
   { to: '/',           label: 'BERANDA',  exact: true  },
   { to: '/produksi',   label: 'PRODUKSI', exact: false },
-  { to: '/nota',       label: 'HPP',      exact: false },
+  { to: '/nota',       label: 'NOTA',     exact: false },
   { to: '/pengaturan', label: 'ATUR',     exact: false },
 ]
 
@@ -38,7 +31,6 @@ export function AppLayout() {
 
   const items = isDeera ? navDeera : navJihan
 
-  // Badge: hitung notifikasi belum dibaca (hanya Jihan / master-as-jihan)
   const { data: notifikasi = [] } = useNotifikasi()
   const unreadCount = notifikasi.filter((n) => !n.is_read).length
 
@@ -47,14 +39,12 @@ export function AppLayout() {
     return location.pathname.startsWith(item.to)
   }
 
-  // Jika master belum pilih view, tampilkan layar pemilihan peran
   if (isMaster && !viewAsRole) {
     return <MasterRolePicker onSelect={setViewAsRole} />
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-champagne-100">
-      {/* Floating toggle master */}
       {isMaster && (
         <div className="fixed right-4 top-4 z-50 flex items-center gap-1 rounded-full border border-gold-500 bg-surface px-3 py-1 shadow-md">
           <span className="mr-1 font-sans text-xs font-semibold text-charcoal-600">LIHAT:</span>

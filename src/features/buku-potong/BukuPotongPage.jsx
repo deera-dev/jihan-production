@@ -20,7 +20,7 @@ export function BukuPotongPage() {
   const [yardData, setYardData] = useState({})  // { warnaId: yardTerpakai }
   // State: pcs per kode_ukuran_warna
   const [pcsData, setPcsData] = useState({})    // { kodeUkuranWarnaId: jumlahPcs }
-  // State: warna baru yang mau ditambahkan (nama warna → qty per ukuran)
+  // State: warna baru yang mau ditambahkan (nama warna -> qty per ukuran)
   const [warnaInput, setWarnaInput] = useState([])
   const [errMsg, setErrMsg] = useState('')
 
@@ -116,7 +116,7 @@ export function BukuPotongPage() {
       {/* Header */}
       <div className="bg-navy-900 px-4 py-5">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="font-sans text-sm text-champagne-100 opacity-70">← KEMBALI</button>
+          <button onClick={() => navigate(-1)} className="font-sans text-sm text-champagne-100 opacity-70">&#8592; KEMBALI</button>
           <div>
             <h1 className="font-heading text-heading text-champagne-100">BUKU POTONG</h1>
             <p className="font-sans text-label text-champagne-100 opacity-60">{kode?.kode_desain}</p>

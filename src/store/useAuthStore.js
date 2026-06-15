@@ -15,19 +15,19 @@ export const useAuthStore = create((set) => ({
   setViewAsRole: (role) => set({ viewAsRole: role }),
 }))
 
-// ─── Helper internal ─────────────────────────────────────────────────────────
+// --- Helper internal ---
 function _effectiveRole(state) {
   const role = state.profile?.role ?? null
   if (role === 'master' && state.viewAsRole) return state.viewAsRole
   return role
 }
 
-// ─── Selectors ───────────────────────────────────────────────────────────────
-export const selectRole      = (state) => _effectiveRole(state)
-export const selectIsDeera   = (state) => _effectiveRole(state) === 'deera'
-export const selectIsJihan   = (state) => _effectiveRole(state) === 'jihan'
-export const selectIsMaster  = (state) => state.profile?.role === 'master'
+// --- Selectors ---
+export const selectRole       = (state) => _effectiveRole(state)
+export const selectIsDeera    = (state) => _effectiveRole(state) === 'deera'
+export const selectIsJihan    = (state) => _effectiveRole(state) === 'jihan'
+export const selectIsMaster   = (state) => state.profile?.role === 'master'
 export const selectActualRole = (state) => state.profile?.role ?? null
 export const selectViewAsRole = (state) => state.viewAsRole
-export const selectProfile   = (state) => state.profile
-export const selectUser      = (state) => state.user
+export const selectProfile    = (state) => state.profile
+export const selectUser       = (state) => state.user

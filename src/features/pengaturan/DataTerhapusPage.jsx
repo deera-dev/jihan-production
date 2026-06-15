@@ -6,7 +6,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { formatTanggal } from '../../utils/formatTanggal'
 
-// Tabel yang support soft delete berdasarkan skema
 const TABEL_SOFT_DELETE = [
   { key: 'produksi', label: 'Produksi', kolom_nama: 'nama_produksi' },
   { key: 'kode', label: 'Kode', kolom_nama: 'kode_desain' },
@@ -38,7 +37,7 @@ export function DataTerhapusPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [tabelAktif, setTabelAktif] = useState('kode')
-  const [konfirmHapus, setKonfirmHapus] = useState(null) // { tabel, id, nama }
+  const [konfirmHapus, setKonfirmHapus] = useState(null)
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['data-terhapus', tabelAktif],
@@ -64,12 +63,11 @@ export function DataTerhapusPage() {
     <div className="min-h-screen bg-champagne-100">
       <div className="bg-navy-900 px-4 py-5">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/pengaturan')} className="font-sans text-sm text-champagne-100 opacity-70">← KEMBALI</button>
+          <button onClick={() => navigate('/pengaturan')} className="font-sans text-sm text-champagne-100 opacity-70">&#8592; KEMBALI</button>
           <h1 className="font-heading text-heading text-champagne-100 flex-1">DATA TERHAPUS</h1>
         </div>
       </div>
 
-      {/* Tab pilih tabel */}
       <div className="flex gap-2 px-4 py-3 overflow-x-auto">
         {TABEL_SOFT_DELETE.map((t) => (
           <button key={t.key} onClick={() => setTabelAktif(t.key)}
@@ -116,7 +114,6 @@ export function DataTerhapusPage() {
         })}
       </div>
 
-      {/* Modal konfirmasi hapus permanen */}
       {konfirmHapus && (
         <div className="fixed inset-0 z-50 flex items-end bg-black/60">
           <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">

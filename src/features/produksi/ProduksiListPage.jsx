@@ -15,14 +15,12 @@ export function ProduksiListPage() {
   const [cari, setCari] = useState('')
 
   const filtered = listProduksi.filter((p) => {
-    // Filter status
     if (filter !== 'semua') {
       const kode = p.kode ?? []
       const semuaSelesai = kode.length > 0 && kode.every((k) => k.status === 'selesai')
       if (filter === 'selesai' && !semuaSelesai) return false
       if (filter === 'aktif' && semuaSelesai) return false
     }
-    // Filter pencarian
     if (cari.trim()) {
       const q = cari.trim().toUpperCase()
       const cocok =
@@ -35,7 +33,6 @@ export function ProduksiListPage() {
 
   return (
     <div className="min-h-screen bg-champagne-100">
-      {/* Header */}
       <div className="flex items-center justify-between bg-navy-900 px-4 py-5">
         <h1 className="font-heading text-heading text-champagne-100">PRODUKSI</h1>
         {isDeera && (
@@ -49,7 +46,6 @@ export function ProduksiListPage() {
       </div>
 
       <div className="px-4 py-4 space-y-4">
-        {/* Cari */}
         <input
           type="search"
           placeholder="Cari kode / bahan..."
@@ -58,7 +54,6 @@ export function ProduksiListPage() {
           className="w-full rounded-xl border border-border bg-surface px-4 py-3 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
         />
 
-        {/* Filter chip */}
         <div className="flex gap-2">
           {[
             { v: 'semua', l: 'SEMUA' },
@@ -80,7 +75,6 @@ export function ProduksiListPage() {
           ))}
         </div>
 
-        {/* Loading / error */}
         {isLoading && (
           <p className="py-12 text-center font-sans text-body text-charcoal-300">MEMUAT...</p>
         )}
@@ -90,7 +84,6 @@ export function ProduksiListPage() {
           </p>
         )}
 
-        {/* Daftar produksi */}
         {!isLoading && filtered.length === 0 && (
           <p className="py-12 text-center font-sans text-body text-charcoal-300">
             {cari || filter !== 'semua' ? 'Tidak ada produksi yang sesuai filter.' : 'Belum ada produksi.'}
@@ -108,8 +101,6 @@ export function ProduksiListPage() {
     </div>
   )
 }
-
-// ─── ProduksiCard ─────────────────────────────────────────────────────────────
 
 function ProduksiCard({ produksi, onClick }) {
   const kode = produksi.kode ?? []

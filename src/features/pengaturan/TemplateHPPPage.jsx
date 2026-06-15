@@ -39,7 +39,7 @@ export function TemplateHPPPage() {
   const profile = useAuthStore(selectProfile)
   const { data: template = [], isLoading } = useQuery({ queryKey: ['template-hpp'], queryFn: ambilTemplate })
 
-  const [editItem, setEditItem] = useState(null)  // item yang sedang diedit / null = tambah baru
+  const [editItem, setEditItem] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ nama: '', nilai_min: '', nilai_max: '' })
   const [konfirmHapus, setKonfirmHapus] = useState(null)
@@ -85,10 +85,10 @@ export function TemplateHPPPage() {
     <div className="min-h-screen bg-champagne-100">
       <div className="bg-navy-900 px-4 py-5">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/pengaturan')} className="font-sans text-sm text-champagne-100 opacity-70">← KEMBALI</button>
+          <button onClick={() => navigate('/pengaturan')} className="font-sans text-sm text-champagne-100 opacity-70">&#8592; KEMBALI</button>
           <h1 className="font-heading text-heading text-champagne-100 flex-1">TEMPLATE HPP</h1>
         </div>
-        <p className="font-sans text-xs text-champagne-100 opacity-50 mt-0.5">Range min–max komponen HPP Jasa</p>
+        <p className="font-sans text-xs text-champagne-100 opacity-50 mt-0.5">Range min&#8211;max komponen HPP Jasa</p>
       </div>
 
       <div className="px-4 py-5 space-y-3">
@@ -105,7 +105,7 @@ export function TemplateHPPPage() {
               <div>
                 <p className="font-sans text-label font-semibold text-navy-900">{item.nama}</p>
                 <p className="font-sans text-xs text-charcoal-600 mt-0.5">
-                  {formatRp(item.nilai_min)} — {formatRp(item.nilai_max)}
+                  {formatRp(item.nilai_min)} &#8212; {formatRp(item.nilai_max)}
                 </p>
               </div>
               <div className="flex gap-2">

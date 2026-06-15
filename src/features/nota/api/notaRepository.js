@@ -1,111 +1,150 @@
-// Repository nota — pembelian bahan baku, alokasi proporsional lintas kode.
+// Repository nota biaya — menggantikan HPP Kalkulator (Task #62).
+// Nota mencakup: bahan (motif & tambahan), aksesoris, biaya produksi, biaya jual beli.
+// Status flow: draft → review → approved/ditolak.
 
 import { supabase } from '../../../lib/supabase'
 
-/** Ambil semua nota (untuk NotaListPage). */
-export async function ambilSemuaNota() {
+/** Ambil semua nota milik satu produksi. */
+export async function ambilNotaByProduksi(produksiId) {
   const { data, error } = await supabase
     .from('nota_pembelian')
     .select(`
-      id, tanggal, catatan, total_nilai, created_at,
-      nota_item (
-        id, nama_custom, tipe, qty, harga_satuan, total_nilai,
-        katalog_bahan_baku (id, nama, tipe, satuan),
-        nota_item_kode (
-          kode_id,
-          kode:kode_id (id, kode_desain)
-        )
+      id, produksi_id, tanggal, catatan,
+      aksesoris, biaya_produksi, biaya_jual_beli,
+      status, alasan_tolak, submitted_at, approved_at,
+      created_at, created_by,
+      nota_kode (
+        kode_id,
+        kode:kode_id (id, kode_desain, status)
       )
     `)
-    .order('tanggal', { ascending: false })
-  if (error) throw error
-  return data ?? []
-}
-
-/** Ambil nota by id (untuk detail). */
-export async function ambilNotaById(notaId) {
-  const { data, error } = await supabase
-    .from('nota_pembelian')
-    .select(`
-      id, tanggal, catatan, total_nilai, created_at,
-      nota_item (
-        id, nama_custom, tipe, qty, harga_satuan, total_nilai,
-        katalog_bahan_baku (id, nama, tipe, satuan),
-        nota_item_kode (
-          kode_id,
-          kode:kode_id (id, kode_desain)
-        )
-      )
-    `)
-    .eq('id', notaId)
-    .maybeSingle()
-  if (error) throw error
-  return data
-}
-
-/** Ambil katalog bahan baku (nama-nama yang sudah dikenal). */
-export async function ambilKatalogBahanBaku() {
-  const { data, error } = await supabase
-    .from('katalog_bahan_baku')
-    .select('id, nama, tipe, satuan, harga_terkini')
-    .eq('is_active', true)
-    .order('nama')
+    .eq('produksi_id', produksiId)
+    .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
 }
 
 /**
- * Buat nota baru beserta item-item dan alokasi kode.
- * @param {{ tanggal: string, catatan?: string, items: Array, created_by: string }} payload
+ * Buat nota baru.
+ * @param {{
+ *   produksi_id: string,
+ *   kode_ids: string[],
+ *   tanggal: string,
+ *   catatan?: string,
+ *   bahan: Array,       // [{nama, tipe_bahan, satuan, harga_per_satuan, pcs_baju, pemakaian_warna?, total_pemakaian?}]
+ *   aksesoris: Array,   // [{nama, harga_per_baju}]
+ *   biaya_produksi: object,
+ *   biaya_jual_beli: number,
+ *   created_by: string
+ * }} payload
  */
-export async function buatNota({ tanggal, catatan, items, created_by }) {
-  // 1. Hitung total nilai
-  const total_nilai = items.reduce((s, item) => {
-    const v = item.tipe === 'unit'
-      ? (item.qty ?? 0) * (item.harga_satuan ?? 0)
-      : (item.total_nilai ?? 0)
-    return s + v
-  }, 0)
-
-  // 2. Insert nota_pembelian
+export async function buatNota({
+  produksi_id, kode_ids, tanggal, catatan,
+  bahan, aksesoris, biaya_produksi, biaya_jual_beli, created_by,
+}) {
   const { data: nota, error: errNota } = await supabase
     .from('nota_pembelian')
-    .insert({ tanggal, catatan: catatan?.toUpperCase() ?? null, total_nilai, created_by })
+    .insert({
+      produksi_id,
+      tanggal,
+      catatan: catatan?.toUpperCase() ?? null,
+      aksesoris: aksesoris ?? [],
+      biaya_produksi: biaya_produksi ?? {},
+      biaya_jual_beli: biaya_jual_beli ?? 20000,
+      status: 'draft',
+      created_by,
+      // simpan bahan di kolom aksesoris sementara pakai field baru nanti
+      // untuk sekarang simpan di catatan-json atau gunakan kolom yang ada
+    })
     .select()
     .single()
   if (errNota) throw errNota
 
-  // 3. Insert nota_item + nota_item_kode
-  for (const item of items) {
-    const totalNilaiItem = item.tipe === 'unit'
-      ? (item.qty ?? 0) * (item.harga_satuan ?? 0)
-      : (item.total_nilai ?? 0)
-
-    const { data: notaItem, error: errItem } = await supabase
-      .from('nota_item')
-      .insert({
-        nota_id: nota.id,
-        katalog_id: item.katalog_id ?? null,
-        nama_custom: item.nama_custom?.toUpperCase() ?? null,
-        tipe: item.tipe,
-        qty: item.tipe === 'unit' ? item.qty : null,
-        harga_satuan: item.tipe === 'unit' ? item.harga_satuan : null,
-        total_nilai: totalNilaiItem,
-      })
-      .select()
-      .single()
-    if (errItem) throw errItem
-
-    // Hubungkan ke kode-kode
-    if (item.kode_ids?.length > 0) {
-      const kodeRows = item.kode_ids.map((kid) => ({
-        nota_item_id: notaItem.id,
-        kode_id: kid,
-      }))
-      const { error: errKode } = await supabase.from('nota_item_kode').insert(kodeRows)
-      if (errKode) throw errKode
-    }
+  // Hubungkan ke kode-kode
+  if (kode_ids?.length > 0) {
+    const rows = kode_ids.map((kid) => ({ nota_id: nota.id, kode_id: kid }))
+    const { error: errKode } = await supabase.from('nota_kode').insert(rows)
+    if (errKode) throw errKode
   }
 
   return nota
+}
+
+/** Submit nota untuk direview Jihan: nota.status → review, kode → review_hpp. */
+export async function submitNotaUntukReview(notaId) {
+  const { data: nota, error: errGet } = await supabase
+    .from('nota_pembelian')
+    .select('id, nota_kode(kode_id)')
+    .eq('id', notaId)
+    .single()
+  if (errGet) throw errGet
+
+  const { error: errNota } = await supabase
+    .from('nota_pembelian')
+    .update({ status: 'review', submitted_at: new Date().toISOString() })
+    .eq('id', notaId)
+  if (errNota) throw errNota
+
+  // Update semua kode terkait
+  const kodeIds = nota.nota_kode?.map((nk) => nk.kode_id) ?? []
+  if (kodeIds.length > 0) {
+    const { error: errKode } = await supabase
+      .from('kode')
+      .update({ status: 'review_hpp' })
+      .in('id', kodeIds)
+      .eq('status', 'input_nota')
+    if (errKode) throw errKode
+  }
+}
+
+/** Approve nota (Jihan): nota.status → approved, kode → produksi. */
+export async function approveNota(notaId) {
+  const { data: nota, error: errGet } = await supabase
+    .from('nota_pembelian')
+    .select('id, nota_kode(kode_id)')
+    .eq('id', notaId)
+    .single()
+  if (errGet) throw errGet
+
+  const { error: errNota } = await supabase
+    .from('nota_pembelian')
+    .update({ status: 'approved', approved_at: new Date().toISOString() })
+    .eq('id', notaId)
+  if (errNota) throw errNota
+
+  const kodeIds = nota.nota_kode?.map((nk) => nk.kode_id) ?? []
+  if (kodeIds.length > 0) {
+    const { error: errKode } = await supabase
+      .from('kode')
+      .update({ status: 'produksi' })
+      .in('id', kodeIds)
+      .eq('status', 'review_hpp')
+    if (errKode) throw errKode
+  }
+}
+
+/** Tolak nota (Jihan): nota.status → ditolak, kode → input_nota. */
+export async function tolakNota(notaId, alasan) {
+  const { data: nota, error: errGet } = await supabase
+    .from('nota_pembelian')
+    .select('id, nota_kode(kode_id)')
+    .eq('id', notaId)
+    .single()
+  if (errGet) throw errGet
+
+  const { error: errNota } = await supabase
+    .from('nota_pembelian')
+    .update({ status: 'ditolak', alasan_tolak: alasan?.toUpperCase() ?? null })
+    .eq('id', notaId)
+  if (errNota) throw errNota
+
+  const kodeIds = nota.nota_kode?.map((nk) => nk.kode_id) ?? []
+  if (kodeIds.length > 0) {
+    const { error: errKode } = await supabase
+      .from('kode')
+      .update({ status: 'input_nota' })
+      .in('id', kodeIds)
+      .eq('status', 'review_hpp')
+    if (errKode) throw errKode
+  }
 }

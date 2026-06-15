@@ -434,7 +434,7 @@ export async function mulaiInputBukuPotong(kodeId) {
   return updateStatusKode(kodeId, { status: 'input_buku_potong' })
 }
 
-/** Selesai input nota → lanjut ke input_hpp. */
-export async function lanjutKeInputHPP(kodeId) {
-  return updateStatusKode(kodeId, { status: 'input_hpp' })
+/** Selesai buku potong → lanjut ke input_nota (untuk buat Nota Biaya). */
+export async function lanjutKeInputNota(kodeId) {
+  return updateStatusKode(kodeId, { status: 'input_nota' })
 }

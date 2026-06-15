@@ -35,7 +35,7 @@ export function ActivityLogPage() {
     <div className="min-h-screen bg-champagne-100">
       <div className="bg-navy-900 px-4 py-5">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/pengaturan')} className="font-sans text-sm text-champagne-100 opacity-70">← KEMBALI</button>
+          <button onClick={() => navigate('/pengaturan')} className="font-sans text-sm text-champagne-100 opacity-70">&#8592; KEMBALI</button>
           <h1 className="font-heading text-heading text-champagne-100 flex-1">ACTIVITY LOG</h1>
         </div>
         <p className="font-sans text-xs text-champagne-100 opacity-50 mt-0.5">{total} entri total</p>
@@ -65,16 +65,15 @@ export function ActivityLogPage() {
           </div>
         ))}
 
-        {/* Pagination */}
         {total > LIMIT && (
           <div className="flex gap-3 pt-2">
             <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}
               className="flex-1 rounded-xl border border-border py-3 font-sans text-label font-semibold text-charcoal-600 disabled:opacity-30">
-              ← SEBELUMNYA
+              &#8592; SEBELUMNYA
             </button>
             <button onClick={() => setPage((p) => p + 1)} disabled={!hasNext}
               className="flex-1 rounded-xl border border-border py-3 font-sans text-label font-semibold text-charcoal-600 disabled:opacity-30">
-              BERIKUTNYA →
+              BERIKUTNYA &#8594;
             </button>
           </div>
         )}

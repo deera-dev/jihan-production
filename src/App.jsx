@@ -11,7 +11,6 @@ import { AppLayout } from './components/layout/AppLayout'
 import { DashboardPage } from './features/dashboard'
 import { ProduksiListPage, ProduksiDetailPage, BuatProduksiPage } from './features/produksi'
 import { KodeDetailPage, BuatKodePage } from './features/kode'
-import { HPPKalkulatorPage } from './features/hpp'
 import { BukuPotongPage } from './features/buku-potong'
 import { NotaListPage } from './features/nota'
 import { KasbonPage } from './features/kasbon'
@@ -39,12 +38,6 @@ export function App() {
           <Route path="/produksi" element={<ProduksiListPage />} />
           <Route path="/produksi/:produksiId" element={<ProduksiDetailPage />} />
           <Route path="/kode/:kodeId" element={<KodeDetailPage />} />
-
-          {/*
-            HPP Kalkulator: Deera input/edit, Jihan lihat & approve/tolak.
-            Pembedaan UI di dalam komponen berdasar role.
-          */}
-          <Route path="/kode/:kodeId/hpp" element={<HPPKalkulatorPage />} />
 
           {/* Pengaturan — konten berbeda per role (di dalam komponen) */}
           <Route path="/pengaturan" element={<PengaturanPage />} />

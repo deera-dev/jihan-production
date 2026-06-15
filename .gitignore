@@ -22,6 +22,7 @@ pnpm-debug.log*
 
 # os
 .DS_Store
+vite.config.js.timestamp*.mjs
 
 # generated (regenerate via `npm run gen:types`)
 # (database.types.d.ts di-commit agar editor langsung dapat tipe — tidak di-ignore)

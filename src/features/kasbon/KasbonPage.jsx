@@ -39,7 +39,6 @@ export function KasbonPage() {
 
   return (
     <div className="min-h-screen bg-champagne-100">
-      {/* Header */}
       <div className="bg-navy-900 px-4 py-5">
         <h1 className="font-heading text-heading text-champagne-100">KASBON</h1>
         <p className="font-sans text-xs text-champagne-100 opacity-50 mt-0.5">SALDO BERJALAN</p>
@@ -50,12 +49,11 @@ export function KasbonPage() {
           {formatRp(saldo)}
         </p>
         <p className="font-sans text-xs text-champagne-100 opacity-50 mt-1">
-          {saldo >= 0 ? 'Dana Deera dari Jihan' : 'Saldo minus — perlu klarifikasi'}
+          {saldo >= 0 ? 'Dana Deera dari Jihan' : 'Saldo minus \u2014 perlu klarifikasi'}
         </p>
       </div>
 
       <div className="px-4 py-5 space-y-4">
-        {/* Tombol tambah (Deera only) */}
         {isDeera && (
           <button
             onClick={() => setShowForm(true)}
@@ -65,7 +63,6 @@ export function KasbonPage() {
           </button>
         )}
 
-        {/* Keterangan saldo */}
         <div className="rounded-xl bg-surface border border-border px-4 py-3 space-y-1">
           <p className="font-sans text-xs text-charcoal-300 uppercase font-semibold">Cara Baca Saldo</p>
           <p className="font-sans text-label text-charcoal-600">
@@ -74,7 +71,6 @@ export function KasbonPage() {
           </p>
         </div>
 
-        {/* Ledger */}
         {isLoading ? (
           <p className="text-center font-sans text-label text-charcoal-300 py-8">MEMUAT...</p>
         ) : ledger.length === 0 ? (
@@ -89,7 +85,6 @@ export function KasbonPage() {
         )}
       </div>
 
-      {/* Bottom sheet form input */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-end bg-black/60">
           <form onSubmit={handleSubmit} className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
@@ -153,20 +148,20 @@ function EntriKartu({ entri }) {
               'rounded-full px-2 py-0.5 font-sans text-xs font-semibold',
               isMasuk ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger',
             ].join(' ')}>
-              {isMasuk ? '+ MASUK' : '− POTONGAN'}
+              {isMasuk ? '+ MASUK' : '\u2212 POTONGAN'}
             </span>
             {entri.kode?.kode_desain && (
               <span className="font-sans text-xs text-charcoal-300">{entri.kode.kode_desain}</span>
             )}
           </div>
           <p className="font-sans text-label text-charcoal-600 mt-1">
-            {entri.catatan ?? (isMasuk ? 'Dana masuk dari Jihan' : 'Potongan otomatis — kode selesai')}
+            {entri.catatan ?? (isMasuk ? 'Dana masuk dari Jihan' : 'Potongan otomatis \u2014 kode selesai')}
           </p>
           <p className="font-sans text-xs text-charcoal-300 mt-0.5">{formatTanggal(entri.tanggal ?? entri.created_at)}</p>
         </div>
         <div className="text-right ml-3">
           <p className={['font-heading text-body font-semibold', isMasuk ? 'text-success' : 'text-danger'].join(' ')}>
-            {isMasuk ? '+' : '−'}{formatRp(entri.nominal)}
+            {isMasuk ? '+' : '\u2212'}{formatRp(entri.nominal)}
           </p>
           <p className="font-sans text-xs text-charcoal-300 mt-0.5">
             Saldo: {formatRp(entri.saldo_berjalan)}

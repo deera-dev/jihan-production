@@ -24,7 +24,7 @@ export function useSession() {
       // Safety-net: jika sesi tidak selesai dalam TIMEOUT_SESI_MS, clear saja.
       timeoutId = setTimeout(() => {
         if (aktif) {
-          console.warn('[useSession] timeout memuat sesi — Supabase tidak merespons?')
+          console.warn('[useSession] timeout memuat sesi \u2014 Supabase tidak merespons?')
           clearSession()
         }
       }, TIMEOUT_SESI_MS)

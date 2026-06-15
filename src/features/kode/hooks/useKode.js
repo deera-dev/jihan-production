@@ -1,4 +1,5 @@
 // Hooks fitur `kode` — jembatan antara komponen dan repository.
+// HPP hooks dihapus (Task #62) — digantikan useNota di features/nota.
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -11,10 +12,6 @@ import {
   approveSampel,
   tolakSampel,
   tambahCatatanSampel,
-  ambilTemplateHPP,
-  simpanHPP,
-  approveHPP,
-  tolakHPP,
   updateTracking,
   catatReject,
   buatSampelDanAjukanReview,
@@ -23,10 +20,10 @@ import {
   batalkanKode,
   lanjutkanDariBatalkan,
   mulaiInputBukuPotong,
-  lanjutKeInputHPP,
+  lanjutKeInputNota,
 } from '../api/kodeRepository'
 
-// ─── QUERIES ──────────────────────────────────────────────────────────────────
+// --- QUERIES ---
 
 export function useDetailKode(kodeId) {
   return useQuery({
@@ -36,15 +33,7 @@ export function useDetailKode(kodeId) {
   })
 }
 
-export function useTemplateHPP() {
-  return useQuery({
-    queryKey: ['hpp-template'],
-    queryFn: ambilTemplateHPP,
-    staleTime: 5 * 60 * 1000,
-  })
-}
-
-// ─── MUTATIONS — KODE ─────────────────────────────────────────────────────────
+// --- MUTATIONS: KODE ---
 
 export function useBuatKode() {
   const qc = useQueryClient()
@@ -85,7 +74,7 @@ export function useUpdatePcsWarna(kodeId) {
   })
 }
 
-// ─── MUTATIONS — SAMPEL ───────────────────────────────────────────────────────
+// --- MUTATIONS: SAMPEL ---
 
 export function useBuatSampel(kodeId) {
   const qc = useQueryClient()
@@ -139,42 +128,7 @@ export function useTambahCatatanSampel(kodeId) {
   })
 }
 
-// ─── MUTATIONS — HPP ──────────────────────────────────────────────────────────
-
-export function useSimpanHPP(kodeId) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ payload, submitUntukReview }) => simpanHPP(kodeId, payload, submitUntukReview),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['kode', kodeId] })
-      qc.invalidateQueries({ queryKey: ['produksi'] })
-    },
-  })
-}
-
-export function useApproveHPP(kodeId) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ hppId }) => approveHPP(hppId, kodeId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['kode', kodeId] })
-      qc.invalidateQueries({ queryKey: ['produksi'] })
-    },
-  })
-}
-
-export function useTolakHPP(kodeId) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ hppId, alasan }) => tolakHPP(hppId, kodeId, alasan),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['kode', kodeId] })
-      qc.invalidateQueries({ queryKey: ['produksi'] })
-    },
-  })
-}
-
-// ─── MUTATIONS — TRACKING ─────────────────────────────────────────────────────
+// --- MUTATIONS: TRACKING ---
 
 export function useUpdateTracking(kodeId) {
   const qc = useQueryClient()
@@ -192,7 +146,7 @@ export function useCatatReject(kodeId) {
   })
 }
 
-// ─── MUTATIONS — STATUS FLOW ──────────────────────────────────────────────────
+// --- MUTATIONS: STATUS FLOW ---
 
 export function useKonfirmasiEstimasi(kodeId) {
   const qc = useQueryClient()
@@ -249,16 +203,13 @@ export function useMulaiInputBukuPotong(kodeId) {
   })
 }
 
-export function useLanjutKeInputHPP(kodeId) {
+export function useLanjutKeInputNota(kodeId) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () => lanjutKeInputHPP(kodeId),
+    mutationFn: () => lanjutKeInputNota(kodeId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kode', kodeId] })
       qc.invalidateQueries({ queryKey: ['produksi'] })
     },
   })
 }
-
-/** @deprecated gunakan useDetailKode */
-export function useKode() { return useDetailKode(null) }

@@ -42,7 +42,7 @@ export function ProduksiDetailPage() {
     <div className="min-h-screen bg-champagne-100">
       {/* Header */}
       <div className="flex items-center gap-3 bg-navy-900 px-4 py-5">
-        <button onClick={() => navigate(-1)} className="font-sans text-body text-champagne-100">←</button>
+        <button onClick={() => navigate(-1)} className="font-sans text-body text-champagne-100">{'<'}</button>
         <div className="flex-1">
           <h1 className="font-heading text-heading text-champagne-100">BATCH {produksi.kode_bahan}</h1>
           <p className="font-sans text-xs text-champagne-200">{formatTanggal(produksi.tanggal)}</p>

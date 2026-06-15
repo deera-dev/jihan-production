@@ -31,7 +31,7 @@ export function GantiPasswordPage() {
     <div className="min-h-screen bg-champagne-100">
       <div className="bg-navy-900 px-4 py-5">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/pengaturan')} className="font-sans text-sm text-champagne-100 opacity-70">← KEMBALI</button>
+          <button onClick={() => navigate('/pengaturan')} className="font-sans text-sm text-champagne-100 opacity-70">&#8592; KEMBALI</button>
           <h1 className="font-heading text-heading text-champagne-100">GANTI KATA SANDI</h1>
         </div>
       </div>

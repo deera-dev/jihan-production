@@ -4,11 +4,12 @@
 import { useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDetailKode, useApproveSampel, useTolakSampel,
-  useTambahCatatanSampel, useApproveHPP, useTolakHPP,
+  useTambahCatatanSampel,
   useBuatSampelDanAjukanReview, useKonfirmasiEstimasi,
   useLanjutkanKeProsesPotong, useBatalkanKode,
   useLanjutkanDariBatalkan, useMulaiInputBukuPotong,
-  useLanjutKeInputHPP } from './hooks/useKode'
+  useLanjutKeInputNota } from './hooks/useKode'
+import { useNotaByProduksi, useApproveNota, useTolakNota } from '../nota/hooks/useNota'
 import { useUpdatePcsDone, useCatatReject } from '../tracking/hooks/useTracking'
 import { usePengirimanByKode, useBuatPengiriman, useApprovePengiriman, useTolakPengiriman } from '../pengiriman/hooks/usePengiriman'
 import { useAuthStore, selectProfile, selectIsDeera } from '../../store/useAuthStore'
@@ -17,13 +18,13 @@ import { formatRp } from '../../utils/formatRp'
 import { formatTanggal } from '../../utils/formatTanggal'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { tolakSampelSchema, catatanSampelSchema, tolakHPPSchema } from './schema'
+import { tolakSampelSchema, catatanSampelSchema } from './schema'
 import { uploadFotoSampel } from '../../lib/cloudinary'
 
 const LANGKAH_STEPPER = [
   { label: 'Sampel', statuses: ['sampel_dibuat', 'review_sampel'] },
   { label: 'Estimasi', statuses: ['estimasi_pemakaian', 'konfirmasi_pemakaian', 'proses_potong'] },
-  { label: 'Buku Potong', statuses: ['input_buku_potong', 'input_nota', 'input_hpp', 'review_hpp'] },
+  { label: 'Buku Potong', statuses: ['input_buku_potong', 'input_nota', 'review_hpp'] },
   { label: 'Produksi', statuses: ['produksi', 'siap_kirim'] },
   { label: 'Selesai', statuses: ['selesai'] },
 ]
@@ -69,7 +70,7 @@ function StatusStepper({ status }) {
   )
 }
 
-const TABS = ['SAMPEL', 'HPP', 'PRODUKSI', 'KIRIM']
+const TABS = ['SAMPEL', 'BIAYA', 'PRODUKSI', 'KIRIM']
 
 export function KodeDetailPage() {
   const { kodeId } = useParams()
@@ -78,7 +79,7 @@ export function KodeDetailPage() {
   const isDeera = useAuthStore(selectIsDeera)
   const [tab, setTab] = useState('SAMPEL')
   const [modalTolakSampel, setModalTolakSampel] = useState(null)
-  const [modalTolakHPP, setModalTolakHPP] = useState(false)
+  const [modalTolakNota, setModalTolakNota] = useState(false)
   const [showUploadSampel, setShowUploadSampel] = useState(false)
   const [showTambahCatatan, setShowTambahCatatan] = useState(null)
 
@@ -87,14 +88,16 @@ export function KodeDetailPage() {
   const tolakSampelMut = useTolakSampel(kodeId)
   const buatSampelMut = useBuatSampelDanAjukanReview(kodeId)
   const tambahCatatanMut = useTambahCatatanSampel(kodeId)
-  const approveHPPMut = useApproveHPP(kodeId)
-  const tolakHPPMut = useTolakHPP(kodeId)
+  const produksiId = kode?.produksi_id ?? null
+  const { data: notaList = [] } = useNotaByProduksi(produksiId)
+  const approveNotaMut = useApproveNota()
+  const tolakNotaMut = useTolakNota()
   const konfirmasiEstimasiMut = useKonfirmasiEstimasi(kodeId)
   const lanjutProsesPotongMut = useLanjutkanKeProsesPotong(kodeId)
   const batalkanMut = useBatalkanKode(kodeId)
   const lanjutDariBatalkanMut = useLanjutkanDariBatalkan(kodeId)
   const mulaiInputBPMut = useMulaiInputBukuPotong(kodeId)
-  const lanjutKeHPPMut = useLanjutKeInputHPP(kodeId)
+  const lanjutKeNotaMut = useLanjutKeInputNota(kodeId)
   const updatePcsDoneMut = useUpdatePcsDone(kodeId)
   const catatRejectMut = useCatatReject(kodeId)
   const { data: pengirimanList = [] } = usePengirimanByKode(kodeId)
@@ -107,7 +110,7 @@ export function KodeDetailPage() {
 
   const status = kode.status
   const sampelAktif = kode.sampel?.find((s) => s.status === 'aktif')
-  const hppData = kode.hpp?.[0] ?? null
+  const notaAktif = notaList.find((n) => ['review','approved'].includes(n.status)) ?? notaList[0] ?? null
 
   return (
     <div className="min-h-screen bg-champagne-100">
@@ -115,7 +118,7 @@ export function KodeDetailPage() {
         <div className="flex items-center gap-3 mb-3">
           <button onClick={() => navigate('/produksi/' + kode.produksi_id)}
             className="font-sans text-sm text-champagne-100 opacity-70 active:opacity-100">
-            \u2190
+            {'\u2190'}
           </button>
           <div className="flex-1">
             <h1 className="font-heading text-heading text-champagne-100">{kode.kode_desain}</h1>
@@ -137,11 +140,11 @@ export function KodeDetailPage() {
             onBatalkan={() => batalkanMut.mutate(status)}
             onLanjutDariBatalkan={() => lanjutDariBatalkanMut.mutate(kode.status_sebelum_dibatalkan)}
             onMulaiInputBP={() => mulaiInputBPMut.mutate(null, { onSuccess: () => navigate('/kode/' + kodeId + '/buku-potong') })}
-            onLanjutKeHPP={() => lanjutKeHPPMut.mutate(null, { onSuccess: () => navigate('/kode/' + kodeId + '/hpp') })}
+            onLanjutKeNota={() => lanjutKeNotaMut.mutate(null, { onSuccess: () => navigate('/nota') })}
             isPending={
               konfirmasiEstimasiMut.isPending || lanjutProsesPotongMut.isPending ||
               batalkanMut.isPending || lanjutDariBatalkanMut.isPending ||
-              mulaiInputBPMut.isPending || lanjutKeHPPMut.isPending
+              mulaiInputBPMut.isPending || lanjutKeNotaMut.isPending
             }
           />
         )}
@@ -167,12 +170,11 @@ export function KodeDetailPage() {
             onCatatanOpen={(sampelId) => setShowTambahCatatan(sampelId)}
             isPending={approveSampelMut.isPending} />
         )}
-        {tab === 'HPP' && (
-          <TabHPP kode={kode} isDeera={isDeera} hppData={hppData} status={status}
-            onApprove={() => approveHPPMut.mutate({ hppId: hppData?.id })}
-            onTolakOpen={() => setModalTolakHPP(true)}
-            onInputHPP={() => navigate('/kode/' + kodeId + '/hpp')}
-            isPending={approveHPPMut.isPending} />
+        {tab === 'BIAYA' && (
+          <TabBiaya nota={notaAktif} isDeera={isDeera} status={status}
+            onApprove={() => approveNotaMut.mutate(notaAktif?.id)}
+            onTolakOpen={() => setModalTolakNota(true)}
+            isPending={approveNotaMut.isPending} />
         )}
         {tab === 'PRODUKSI' && (
           <TabProduksi kode={kode} isDeera={isDeera}
@@ -196,12 +198,12 @@ export function KodeDetailPage() {
             { onSuccess: () => setModalTolakSampel(null) })}
           onClose={() => setModalTolakSampel(null)} />
       )}
-      {modalTolakHPP && (
-        <ModalTolak title="TOLAK HPP" placeholder="ALASAN PENOLAKAN HPP" schema={tolakHPPSchema}
-          isPending={tolakHPPMut.isPending}
-          onSubmit={({ alasan }) => tolakHPPMut.mutate({ hppId: hppData?.id, alasan },
-            { onSuccess: () => setModalTolakHPP(false) })}
-          onClose={() => setModalTolakHPP(false)} />
+      {modalTolakNota && (
+        <ModalTolak title="TOLAK NOTA BIAYA" placeholder="ALASAN PENOLAKAN" schema={tolakSampelSchema}
+          isPending={tolakNotaMut.isPending}
+          onSubmit={({ alasan }) => tolakNotaMut.mutate({ notaId: notaAktif?.id, alasan },
+            { onSuccess: () => setModalTolakNota(false) })}
+          onClose={() => setModalTolakNota(false)} />
       )}
       {showUploadSampel && (
         <ModalUploadSampel kode={kode} isPending={buatSampelMut.isPending}
@@ -229,8 +231,8 @@ function TabSampel({ kode, isDeera, sampelAktif, status, onApprove, onTolakOpen,
   const bisaUpload  = isDeera && status === 'sampel_dibuat'
   const bisaApprove = !isDeera && status === 'review_sampel' && sampelAktif
   const showEstimasi = ['estimasi_pemakaian','konfirmasi_pemakaian','proses_potong',
-    'input_buku_potong','input_nota','input_hpp','review_hpp','hpp_ditolak',
-    'hpp_approved','produksi','siap_kirim','selesai'].includes(status)
+    'input_buku_potong','input_nota','review_hpp',
+    'produksi','siap_kirim','selesai'].includes(status)
 
   return (
     <div className="space-y-4">
@@ -369,7 +371,7 @@ function SampelCard({ sampel, onTambahCatatan }) {
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2 p-3">
-        {[sampel.foto_depan_url, sampel.foto_belakang_url].map((url, i) => (
+        {[sampel.foto_depan_url, sampel.foto_belakang_url].filter(Boolean).map((url, i) => (
           <button key={i} onClick={() => setLihatFoto(url)} className="aspect-square overflow-hidden rounded-lg bg-champagne-100">
             <img src={url} alt={i === 0 ? 'Depan' : 'Belakang'} className="h-full w-full object-cover" />
           </button>
@@ -403,26 +405,26 @@ function SampelCard({ sampel, onTambahCatatan }) {
   )
 }
 
-// ─── TabHPP ───────────────────────────────────────────────────────────────────
-function TabHPP({ kode, isDeera, hppData, status, onApprove, onTolakOpen, onInputHPP, isPending }) {
-  const bisaInput   = isDeera && ['input_hpp','hpp_ditolak','estimasi_pemakaian',
-    'konfirmasi_pemakaian','proses_potong','input_buku_potong','input_nota'].includes(status)
-  const bisaApprove = !isDeera && status === 'review_hpp' && hppData
-  const hppApproved = hppData?.status === 'approved'
+// ─── TabBiaya ────────────────────────────────────────────────────────────────
+function TabBiaya({ nota, isDeera, status, onApprove, onTolakOpen, isPending }) {
+  const bisaApprove = !isDeera && status === 'review_hpp' && nota
+  const bp = nota?.biaya_produksi ?? {}
+  const totalBP = (bp.jahit||0) + (bp.potong||0) + (bp.finishing||0) + (bp.atk||0)
+  const formatRp2 = (n) => 'Rp ' + Number(n||0).toLocaleString('id-ID')
 
   return (
     <div className="space-y-4">
-      {hppData?.status === 'ditolak' && (
+      {nota?.status === 'ditolak' && (
         <div className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-3">
-          <p className="font-sans text-label font-semibold text-danger">HPP DITOLAK</p>
-          {hppData.alasan_tolak && <p className="mt-1 font-sans text-label text-danger">{hppData.alasan_tolak}</p>}
+          <p className="font-sans text-label font-semibold text-danger">NOTA BIAYA DITOLAK</p>
+          {nota.alasan_tolak && <p className="mt-1 font-sans text-label text-danger">{nota.alasan_tolak}</p>}
         </div>
       )}
       {bisaApprove && (
         <div className="flex gap-3">
           <button onClick={onApprove} disabled={isPending}
             className="flex-1 rounded-xl bg-gold-500 py-3.5 font-sans text-body font-semibold text-navy-900 disabled:opacity-50">
-            APPROVE HPP
+            APPROVE NOTA BIAYA
           </button>
           <button onClick={onTolakOpen}
             className="flex-1 rounded-xl border border-danger py-3.5 font-sans text-body font-semibold text-danger">
@@ -430,95 +432,55 @@ function TabHPP({ kode, isDeera, hppData, status, onApprove, onTolakOpen, onInpu
           </button>
         </div>
       )}
-      {bisaInput && (
-        <button onClick={onInputHPP}
-          className="w-full rounded-xl bg-navy-900 py-3.5 font-sans text-body font-semibold text-champagne-100">
-          {hppData ? 'EDIT HPP' : 'INPUT HPP'}
-        </button>
-      )}
-      {hppData ? <HPPBreakdown hpp={hppData} /> : (
+      {nota ? (
+        <div className="rounded-xl border border-border bg-surface overflow-hidden">
+          <div className="bg-navy-900 px-4 py-3">
+            <p className="font-sans text-xs font-semibold uppercase tracking-widest text-gold-400">NOTA BIAYA</p>
+            <p className="font-sans text-xs text-champagne-400 mt-0.5">
+              Status: <span className="font-semibold uppercase text-champagne-200">{nota.status}</span>
+            </p>
+          </div>
+          <div className="divide-y divide-border">
+            {(nota.aksesoris||[]).length > 0 && (
+              <div className="px-4 py-3 space-y-1">
+                <p className="font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500 mb-2">AKSESORIS</p>
+                {nota.aksesoris.map((a, i) => (
+                  <div key={i} className="flex justify-between">
+                    <span className="font-sans text-xs text-charcoal-700">{a.nama}</span>
+                    <span className="font-sans text-xs font-semibold text-navy-900">{formatRp2(a.harga_per_baju)}/baju</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="px-4 py-3">
+              <p className="font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500 mb-2">BIAYA PRODUKSI</p>
+              {bp.tampilkan_rincian ? (
+                <div className="space-y-1">
+                  {[['Jahit', bp.jahit],['Potong', bp.potong],['Finishing', bp.finishing],['ATK', bp.atk]].map(([l,v]) => (
+                    <div key={l} className="flex justify-between">
+                      <span className="font-sans text-xs text-charcoal-700">{l}</span>
+                      <span className="font-sans text-xs text-navy-900">{formatRp2(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="font-sans text-xs text-charcoal-700">
+                  Kisaran {formatRp2(35000)} \u2013 {formatRp2(45000)}/baju
+                  <span className="ml-2 text-charcoal-400">(total: {formatRp2(totalBP)}/baju)</span>
+                </p>
+              )}
+            </div>
+            <div className="px-4 py-3 flex justify-between">
+              <span className="font-sans text-xs text-charcoal-600">Biaya Jual Beli</span>
+              <span className="font-sans text-xs font-semibold text-navy-900">{formatRp2(nota.biaya_jual_beli || 20000)}/baju</span>
+            </div>
+          </div>
+        </div>
+      ) : (
         <p className="py-8 text-center font-sans text-body text-charcoal-300">
-          {status === 'review_hpp' || hppApproved
-            ? 'HPP belum tersedia.'
-            : 'HPP belum diinput. Selesaikan tahap sebelumnya terlebih dahulu.'}
+          Nota biaya belum tersedia. Selesaikan tahap sebelumnya terlebih dahulu.
         </p>
       )}
-      {hppData?.hpp_revisi?.length > 0 && <HPPRevisiList revisi={hppData.hpp_revisi} />}
-    </div>
-  )
-}
-
-function HPPBreakdown({ hpp }) {
-  const jasa     = hpp.jasa_komponen ?? []
-  const sekunder = hpp.snapshot_bahan_sekunder ?? []
-  const baku     = hpp.snapshot_bahan_baku ?? []
-  return (
-    <div className="rounded-xl bg-surface border border-border overflow-hidden">
-      <div className="bg-navy-900 px-4 py-3 flex justify-between items-center">
-        <p className="font-sans text-label font-semibold text-champagne-100">TOTAL HPP / PCS</p>
-        <p className="font-heading text-xl text-gold-500">{formatRp(hpp.total_hpp_per_baju)}</p>
-      </div>
-      <div className="divide-y divide-border">
-        <Section label="HPP JASA" total={hpp.total_hpp_jasa}>
-          {jasa.map((k, i) => <Row key={i} label={k.nama} value={formatRp(k.nilai)} />)}
-        </Section>
-        {hpp.snapshot_bahan_primer != null && (
-          <Section label="BAHAN PRIMER" total={hpp.snapshot_bahan_primer}>
-            <Row label="Per pcs (rata dari semua warna)" value={formatRp(hpp.snapshot_bahan_primer)} />
-          </Section>
-        )}
-        {sekunder.length > 0 && (
-          <Section label="BAHAN SEKUNDER" total={null}>
-            {sekunder.map((b, i) => <Row key={i} label={b.nama} value={formatRp(b.hpp_per_pcs)} />)}
-          </Section>
-        )}
-        {baku.length > 0 && (
-          <Section label="BAHAN BAKU" total={hpp.total_bahan_baku}>
-            {baku.map((b, i) => <Row key={i} label={b.nama} value={formatRp(b.hpp_per_pcs)} />)}
-          </Section>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function Section({ label, total, children }) {
-  return (
-    <div className="px-4 py-3 space-y-1.5">
-      <div className="flex justify-between items-center mb-2">
-        <p className="font-sans text-xs font-semibold text-charcoal-300 uppercase">{label}</p>
-        {total != null && <p className="font-sans text-label font-semibold text-navy-900">{formatRp(total)}</p>}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function Row({ label, value }) {
-  return (
-    <div className="flex justify-between items-center">
-      <p className="font-sans text-label text-charcoal-600">{label}</p>
-      <p className="font-sans text-label text-navy-900">{value}</p>
-    </div>
-  )
-}
-
-function HPPRevisiList({ revisi }) {
-  const sorted = [...revisi].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-  return (
-    <div className="rounded-xl bg-surface border border-border px-4 py-3 space-y-3">
-      <p className="font-sans text-label font-semibold text-charcoal-600 uppercase">Riwayat Revisi</p>
-      {sorted.map((r) => (
-        <div key={r.id} className="border-t border-border pt-3">
-          <p className="font-sans text-xs text-charcoal-300">{formatTanggal(r.created_at)}</p>
-          <p className="font-sans text-label text-navy-900 font-semibold">{r.komponen}</p>
-          <div className="flex gap-3 mt-1">
-            <span className="font-sans text-label text-danger line-through">{formatRp(r.nilai_lama?.nilai ?? 0)}</span>
-            <span className="font-sans text-label text-success">\u2192 {formatRp(r.nilai_baru?.nilai ?? 0)}</span>
-          </div>
-          {r.alasan && <p className="font-sans text-xs text-charcoal-600 mt-1">{r.alasan}</p>}
-        </div>
-      ))}
     </div>
   )
 }
@@ -638,7 +600,7 @@ function WarnaTracking({ warna, isDeera, onUpdatePcs, onCatatReject }) {
         <div className="fixed inset-0 z-50 flex items-end bg-black/60">
           <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
             <p className="font-heading text-heading text-navy-900">UPDATE {TAHAP_LABEL[editTahap.tahap].toUpperCase()}</p>
-            <p className="font-sans text-label text-charcoal-600">Warna: {warna.nama_warna} — Total {totalPcs} pcs</p>
+            <p className="font-sans text-label text-charcoal-600">Warna: {warna.nama_warna} \u2014 Total {totalPcs} pcs</p>
             <div className="space-y-1">
               <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Pcs Selesai</label>
               <input type="number" min={0} max={totalPcs} value={inputPcs}
@@ -659,7 +621,7 @@ function WarnaTracking({ warna, isDeera, onUpdatePcs, onCatatReject }) {
         <div className="fixed inset-0 z-50 flex items-end bg-black/60">
           <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4 max-h-[90vh] overflow-y-auto">
             <p className="font-heading text-heading text-navy-900">CATAT REJECT</p>
-            <p className="font-sans text-label text-charcoal-600">Tahap: {TAHAP_LABEL[rejectFor.tahap]} — {warna.nama_warna}</p>
+            <p className="font-sans text-label text-charcoal-600">Tahap: {TAHAP_LABEL[rejectFor.tahap]} \u2014 {warna.nama_warna}</p>
             <div className="space-y-3">
               <div className="space-y-1">
                 <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Jumlah Reject (pcs)</label>
@@ -784,7 +746,7 @@ function TabKirim({ kode, isDeera, pengirimanList, onBuat, onApprove, onTolak, i
                     className="w-20 rounded-xl border border-border px-3 py-3 font-sans text-label text-navy-900 outline-none focus:border-gold-500 text-right" />
                   {items.length > 1 && (
                     <button type="button" onClick={() => setItems((p) => p.filter((_, j) => j !== i))}
-                      className="font-sans text-xs text-danger px-1">\u2715</button>
+                      className="font-sans text-xs text-danger px-1">&#10005;</button>
                   )}
                 </div>
               ))}
@@ -912,7 +874,7 @@ function ModalUploadSampel({ kode, onSubmit, onClose, isPending }) {
     <div className="fixed inset-0 z-50 flex items-end bg-black/60">
       <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4 max-h-[90vh] overflow-y-auto">
         <p className="font-heading text-heading text-navy-900">UPLOAD SAMPEL</p>
-        <p className="font-sans text-label text-charcoal-600">Upload 2 foto: tampak depan & belakang.</p>
+        <p className="font-sans text-label text-charcoal-600">Upload foto tampak depan & belakang (keduanya opsional \u2014 isi minimal satu).</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             {[['Depan', fotoDepan, setFotoDepan, refDepan], ['Belakang', fotoBelakang, setFotoBelakang, refBelakang]].map(([label, foto, setFoto, ref]) => (
@@ -933,7 +895,7 @@ function ModalUploadSampel({ kode, onSubmit, onClose, isPending }) {
           <div className="flex gap-3">
             <button type="button" onClick={onClose} disabled={busy}
               className="flex-1 rounded-xl border border-border py-3.5 font-sans text-body font-semibold text-charcoal-600 disabled:opacity-50">BATAL</button>
-            <button type="submit" disabled={busy || !fotoDepan || !fotoBelakang}
+            <button type="submit" disabled={busy}
               className="flex-1 rounded-xl bg-gold-500 py-3.5 font-sans text-body font-semibold text-navy-900 disabled:opacity-50">
               {busy ? 'MENGUPLOAD...' : 'AJUKAN REVIEW'}
             </button>
@@ -974,7 +936,7 @@ function ModalCatatan({ onSubmit, onClose, isPending }) {
 // ─── StatusAksiPanel ──────────────────────────────────────────────────────────
 function StatusAksiPanel({ status, statusSebelum, kodeId, navigate,
   onKonfirmasiEstimasi, onLanjutProsesPotong, onBatalkan,
-  onLanjutDariBatalkan, onMulaiInputBP, onLanjutKeHPP, isPending }) {
+  onLanjutDariBatalkan, onMulaiInputBP, onLanjutKeNota, isPending }) {
   if (!status) return null
 
   const btn = (label, onClick, variant = 'primary') => (
@@ -1012,15 +974,8 @@ function StatusAksiPanel({ status, statusSebelum, kodeId, navigate,
   }
   if (status === 'input_nota') {
     rows.push(<div key="nota" className="flex gap-2">
-      {btn('BUKA DAFTAR NOTA', () => navigate('/nota'), 'secondary')}
-      {btn('SELESAI \u2192 INPUT HPP', onLanjutKeHPP)}
+      {btn('BUAT / LIHAT NOTA BIAYA', onLanjutKeNota)}
     </div>)
-  }
-  if (status === 'input_hpp') {
-    rows.push(<div key="hpp" className="flex gap-2">{btn('INPUT HPP', () => navigate('/kode/' + kodeId + '/hpp'))}</div>)
-  }
-  if (status === 'hpp_ditolak') {
-    rows.push(<div key="hpp-revisi" className="flex gap-2">{btn('REVISI HPP', () => navigate('/kode/' + kodeId + '/hpp'))}</div>)
   }
   if (status === 'dibatalkan' && statusSebelum) {
     rows.push(<div key="batal" className="flex gap-2">{btn('REVISI & LANJUTKAN', onLanjutDariBatalkan)}</div>)

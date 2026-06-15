@@ -45,7 +45,6 @@ export function NotifikasiPage() {
 
   return (
     <div className="min-h-screen bg-champagne-100">
-      {/* Header */}
       <div className="bg-navy-900 px-4 py-5">
         <div className="flex items-center justify-between">
           <div>
@@ -67,7 +66,6 @@ export function NotifikasiPage() {
       </div>
 
       <div className="px-4 py-5 space-y-5">
-        {/* Preferensi mode — hanya untuk Jihan */}
         {!isDeera && (
           <div className="rounded-xl bg-surface border border-border px-4 py-4">
             <p className="font-sans text-xs font-semibold text-charcoal-300 uppercase mb-3">Mode Notifikasi</p>
@@ -82,7 +80,6 @@ export function NotifikasiPage() {
                     : 'Notifikasi langsung setiap ada aktivitas'}
                 </p>
               </div>
-              {/* Toggle */}
               <button
                 onClick={toggleMode}
                 disabled={simpanPrefMut.isPending}
@@ -98,7 +95,6 @@ export function NotifikasiPage() {
               </button>
             </div>
 
-            {/* Jam digest (hanya muncul jika digest aktif) */}
             {preferensi?.mode === 'digest_harian' && (
               <div className="mt-3 flex items-center gap-3">
                 <p className="font-sans text-xs text-charcoal-600">Jam pengiriman:</p>
@@ -113,7 +109,6 @@ export function NotifikasiPage() {
           </div>
         )}
 
-        {/* Daftar notifikasi */}
         {isLoading ? (
           <p className="text-center font-sans text-label text-charcoal-300 py-8">MEMUAT...</p>
         ) : notifikasi.length === 0 ? (

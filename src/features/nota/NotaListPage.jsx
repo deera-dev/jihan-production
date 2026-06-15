@@ -1,120 +1,371 @@
-// JP-021 / JP-023 — Daftar & Input Nota Pembelian Bahan Baku.
+// Task #62 — Nota Biaya (menggantikan HPP Kalkulator).
 // Hanya Deera yang bisa akses (route guard + RLS).
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useDaftarNota, useBuatNota, useKatalogBahanBaku } from './hooks/useNota'
+import { useNotaByProduksi, useBuatNota } from './hooks/useNota'
 import { useDaftarProduksi } from '../produksi/hooks/useProduksi'
 import { useAuthStore, selectProfile } from '../../store/useAuthStore'
 import { formatRp } from '../../utils/formatRp'
 import { formatTanggal } from '../../utils/formatTanggal'
 
-const TIPE_ITEM = [
-  { v: 'unit', l: 'Unit (pcs/rol)' },
-  { v: 'usage', l: 'Usage (nilai total)' },
+// ─── Konstanta ────────────────────────────────────────────────────────────────
+
+const AKSESORIS_DEFAULT = [
+  { nama: 'LABEL BESAR', harga_per_baju: 150 },
+  { nama: 'LABEL KECIL', harga_per_baju: 50 },
+  { nama: 'HANGTAG', harga_per_baju: 150 },
+  { nama: 'PLASTIK', harga_per_baju: 1750 },
+  { nama: 'PLAT BESI (PIN)', harga_per_baju: 2500 },
 ]
 
-export function NotaListPage() {
-  const navigate = useNavigate()
-  const profile = useAuthStore(selectProfile)
-  const { data: listNota = [], isLoading } = useDaftarNota()
-  const { data: katalog = [] } = useKatalogBahanBaku()
-  const { data: listProduksi = [] } = useDaftarProduksi()
-  const buatNotaMut = useBuatNota()
+const BIAYA_PRODUKSI_DEFAULT = {
+  jahit: 25000,
+  potong: 4750,
+  finishing: 3500,
+  atk: 4000,
+  tampilkan_rincian: false,
+}
 
-  const [showForm, setShowForm] = useState(false)
+// ─── Helper ───────────────────────────────────────────────────────────────────
 
-  // Kumpulkan semua kode aktif dari semua produksi
-  const semuaKode = listProduksi.flatMap((p) =>
-    (p.kode ?? []).filter((k) => !['selesai', 'dibatalkan'].includes(k.status))
-      .map((k) => ({ ...k, produksi: p }))
-  )
+function totalBiayaProduksi(bp) {
+  return (bp.jahit || 0) + (bp.potong || 0) + (bp.finishing || 0) + (bp.atk || 0)
+}
+
+function hitungBiayaBahan(bahan) {
+  // MOTIF: biaya = sum(warna.yard * harga_per_satuan) / pcs_baju
+  // TAMBAHAN: biaya = total_pemakaian * harga_per_satuan / pcs_baju
+  if (!bahan.harga_per_satuan || !bahan.pcs_baju || bahan.pcs_baju === 0) return 0
+  if (bahan.tipe_bahan === 'primer') {
+    const totalYard = (bahan.pemakaian_warna || []).reduce((s, w) => s + (w.yard || 0), 0)
+    return Math.round((totalYard * bahan.harga_per_satuan) / bahan.pcs_baju)
+  }
+  return Math.round(((bahan.total_pemakaian || 0) * bahan.harga_per_satuan) / bahan.pcs_baju)
+}
+
+// ─── Sub-komponen: ItemBahan ──────────────────────────────────────────────────
+
+function ItemBahan({ item, warnaList, totalPcs, onChange, onHapus }) {
+  const biayaPerBaju = hitungBiayaBahan(item)
+
+  function setField(key, val) {
+    onChange({ ...item, [key]: val })
+  }
+
+  function setWarna(idx, key, val) {
+    const warna = [...(item.pemakaian_warna || [])]
+    warna[idx] = { ...warna[idx], [key]: val }
+    onChange({ ...item, pemakaian_warna: warna })
+  }
+
+  function tambahWarna() {
+    const warna = [...(item.pemakaian_warna || []), { nama: '', yard: 0 }]
+    onChange({ ...item, pemakaian_warna: warna })
+  }
+
+  function hapusWarna(idx) {
+    const warna = (item.pemakaian_warna || []).filter((_, i) => i !== idx)
+    onChange({ ...item, pemakaian_warna: warna })
+  }
+
+  const totalYardMotif = (item.pemakaian_warna || []).reduce((s, w) => s + (w.yard || 0), 0)
 
   return (
-    <div className="min-h-screen bg-champagne-100">
-      <div className="flex items-center justify-between bg-navy-900 px-4 py-5">
-        <h1 className="font-heading text-heading text-champagne-100">NOTA</h1>
+    <div className="rounded-2xl border border-border bg-surface p-4 space-y-3">
+      {/* Header bahan */}
+      <div className="flex items-center gap-2">
+        <input
+          className="flex-1 rounded-xl border border-border bg-champagne-50 px-3 py-2 font-sans text-sm font-semibold uppercase text-navy-900 placeholder:normal-case placeholder:font-normal placeholder:text-charcoal-400"
+          placeholder="Nama bahan (contoh: TRIKOT MOTIF BUNGA)"
+          value={item.nama || ''}
+          onChange={(e) => setField('nama', e.target.value.toUpperCase())}
+        />
         <button
-          onClick={() => setShowForm(true)}
-          className="rounded-lg bg-gold-500 px-3 py-1.5 font-sans text-xs font-semibold text-navy-900"
+          onClick={onHapus}
+          className="shrink-0 rounded-xl border border-danger px-3 py-2 font-sans text-xs font-bold text-danger active:opacity-70"
         >
-          + NOTA BARU
+          HAPUS
         </button>
       </div>
 
-      <div className="px-4 py-4 space-y-3">
-        {isLoading && <p className="py-8 text-center font-sans text-body text-charcoal-300">MEMUAT...</p>}
-        {!isLoading && listNota.length === 0 && (
-          <p className="py-8 text-center font-sans text-body text-charcoal-300">Belum ada nota.</p>
-        )}
-        {listNota.map((nota) => (
-          <NotaCard key={nota.id} nota={nota} />
-        ))}
+      {/* Toggle tipe */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => onChange({ ...item, tipe_bahan: 'primer', pemakaian_warna: item.pemakaian_warna?.length ? item.pemakaian_warna : warnaList.map((n) => ({ nama: n, yard: 0 })) })}
+          className={[
+            'flex-1 rounded-xl border py-2 font-sans text-xs font-bold tracking-wide transition-colors',
+            item.tipe_bahan === 'primer'
+              ? 'border-gold-500 bg-gold-500 text-navy-900'
+              : 'border-border text-charcoal-400',
+          ].join(' ')}
+        >
+          MOTIF
+        </button>
+        <button
+          onClick={() => onChange({ ...item, tipe_bahan: 'sekunder', pemakaian_warna: [] })}
+          className={[
+            'flex-1 rounded-xl border py-2 font-sans text-xs font-bold tracking-wide transition-colors',
+            item.tipe_bahan === 'sekunder'
+              ? 'border-navy-900 bg-navy-900 text-champagne-100'
+              : 'border-border text-charcoal-400',
+          ].join(' ')}
+        >
+          TAMBAHAN
+        </button>
       </div>
 
-      {showForm && (
-        <FormNota
-          katalog={katalog}
-          semuaKode={semuaKode}
-          isPending={buatNotaMut.isPending}
-          error={buatNotaMut.error}
-          onSubmit={(payload) =>
-            buatNotaMut.mutate(
-              { ...payload, created_by: profile?.id },
-              { onSuccess: () => setShowForm(false) }
-            )
-          }
-          onClose={() => setShowForm(false)}
-        />
+      {/* MOTIF: per-warna */}
+      {item.tipe_bahan === 'primer' && (
+        <div className="space-y-2">
+          <p className="font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500">
+            PEMAKAIAN PER WARNA (YARD)
+          </p>
+          {(item.pemakaian_warna || []).map((w, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <input
+                className="w-28 rounded-xl border border-border bg-champagne-50 px-3 py-2 font-sans text-xs uppercase text-navy-900 placeholder:normal-case placeholder:font-normal"
+                placeholder="Nama warna"
+                value={w.nama || ''}
+                onChange={(e) => setWarna(idx, 'nama', e.target.value.toUpperCase())}
+              />
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                className="flex-1 rounded-xl border border-border bg-champagne-50 px-3 py-2 font-sans text-sm text-navy-900"
+                placeholder="0"
+                value={w.yard || ''}
+                onChange={(e) => setWarna(idx, 'yard', parseFloat(e.target.value) || 0)}
+              />
+              <span className="font-sans text-xs text-charcoal-500">yard</span>
+              <button
+                onClick={() => hapusWarna(idx)}
+                className="font-sans text-xs text-danger active:opacity-70"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={tambahWarna}
+            className="font-sans text-xs font-semibold text-gold-600 active:opacity-70"
+          >
+            + TAMBAH WARNA
+          </button>
+          <div className="flex items-center justify-between rounded-xl bg-champagne-100 px-3 py-2">
+            <span className="font-sans text-xs text-charcoal-600">
+              Total {(item.pemakaian_warna || []).length} warna
+            </span>
+            <span className="font-sans text-xs font-semibold text-navy-900">
+              {totalYardMotif.toLocaleString('id-ID')} yard
+            </span>
+          </div>
+        </div>
       )}
+
+      {/* TAMBAHAN: total pemakaian */}
+      {item.tipe_bahan === 'sekunder' && (
+        <div className="space-y-2">
+          <p className="font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500">
+            TOTAL PEMAKAIAN
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              className="flex-1 rounded-xl border border-border bg-champagne-50 px-3 py-2 font-sans text-sm text-navy-900"
+              placeholder="0"
+              value={item.total_pemakaian || ''}
+              onChange={(e) => setField('total_pemakaian', parseFloat(e.target.value) || 0)}
+            />
+            <span className="font-sans text-xs text-charcoal-500">yard / panel</span>
+          </div>
+        </div>
+      )}
+
+      {/* Harga & pcs */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <p className="mb-1 font-sans text-xs text-charcoal-500">HARGA / YARD</p>
+          <div className="flex items-center gap-1 rounded-xl border border-border bg-champagne-50 px-3 py-2">
+            <span className="font-sans text-xs text-charcoal-400">Rp</span>
+            <input
+              type="number"
+              min="0"
+              className="w-full bg-transparent font-sans text-sm text-navy-900 outline-none"
+              placeholder="0"
+              value={item.harga_per_satuan || ''}
+              onChange={(e) => setField('harga_per_satuan', parseInt(e.target.value) || 0)}
+            />
+          </div>
+        </div>
+        <div>
+          <p className="mb-1 font-sans text-xs text-charcoal-500">UNTUK BAJU</p>
+          <div className="flex items-center gap-1 rounded-xl border border-border bg-champagne-50 px-3 py-2">
+            <input
+              type="number"
+              min="1"
+              className="w-full bg-transparent font-sans text-sm text-navy-900 outline-none"
+              placeholder={totalPcs || '0'}
+              value={item.pcs_baju || ''}
+              onChange={(e) => setField('pcs_baju', parseInt(e.target.value) || 0)}
+            />
+            <span className="font-sans text-xs text-charcoal-400">pcs</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Ringkasan biaya */}
+      <div className="flex items-center justify-between rounded-xl bg-navy-900 px-4 py-3">
+        <div>
+          <p className="font-sans text-xs text-champagne-300">
+            {item.tipe_bahan === 'primer'
+              ? `${totalYardMotif.toLocaleString('id-ID')} yard total`
+              : `${(item.total_pemakaian || 0).toLocaleString('id-ID')} yard / panel`}
+          </p>
+          <p className="font-sans text-xs text-champagne-400">
+            untuk {(item.pcs_baju || totalPcs || 0).toLocaleString('id-ID')} baju
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="font-sans text-xs text-champagne-400">Per baju</p>
+          <p className="font-heading text-lg font-bold text-gold-400">
+            {formatRp(biayaPerBaju)}
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
 
-// ─── NotaCard ─────────────────────────────────────────────────────────────────
+// ─── Sub-komponen: ItemAksesoris ──────────────────────────────────────────────
+
+function ItemAksesoris({ item, onChange, onHapus }) {
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        className="flex-1 rounded-xl border border-border bg-champagne-50 px-3 py-2 font-sans text-xs uppercase text-navy-900 placeholder:normal-case placeholder:font-normal"
+        placeholder="Nama aksesoris"
+        value={item.nama || ''}
+        onChange={(e) => onChange({ ...item, nama: e.target.value.toUpperCase() })}
+      />
+      <div className="flex items-center gap-1 rounded-xl border border-border bg-champagne-50 px-3 py-2 w-32">
+        <span className="font-sans text-xs text-charcoal-400">Rp</span>
+        <input
+          type="number"
+          min="0"
+          className="w-full bg-transparent font-sans text-xs text-navy-900 outline-none"
+          placeholder="0"
+          value={item.harga_per_baju || ''}
+          onChange={(e) => onChange({ ...item, harga_per_baju: parseInt(e.target.value) || 0 })}
+        />
+      </div>
+      <button
+        onClick={onHapus}
+        className="font-sans text-xs text-danger active:opacity-70 shrink-0"
+      >
+        ✕
+      </button>
+    </div>
+  )
+}
+
+// ─── Sub-komponen: NotaCard ───────────────────────────────────────────────────
+
 function NotaCard({ nota }) {
-  const [open, setOpen] = useState(false)
-  const kodeList = [...new Set(
-    (nota.nota_item ?? []).flatMap((i) => (i.nota_item_kode ?? []).map((x) => x.kode?.kode_desain))
-  )].filter(Boolean)
+  const [buka, setBuka] = useState(false)
+  const bp = nota.biaya_produksi || {}
+  const totalBP = totalBiayaProduksi(bp)
+  const totalAksesoris = (nota.aksesoris || []).reduce((s, a) => s + (a.harga_per_baju || 0), 0)
+  const kodeList = nota.nota_kode?.map((nk) => nk.kode?.kode_desain).filter(Boolean) ?? []
+
+  const badgeColor = {
+    draft: 'bg-charcoal-200 text-charcoal-700',
+    review: 'bg-gold-100 text-gold-700',
+    approved: 'bg-green-100 text-green-700',
+    ditolak: 'bg-red-100 text-red-700',
+  }[nota.status] ?? 'bg-charcoal-100 text-charcoal-600'
 
   return (
-    <div className="rounded-xl bg-surface border border-border overflow-hidden">
-      <button onClick={() => setOpen((v) => !v)} className="w-full px-4 py-3.5 flex items-start justify-between text-left">
-        <div>
-          <p className="font-sans text-label font-semibold text-navy-900">{formatTanggal(nota.tanggal)}</p>
-          <p className="font-sans text-xs text-charcoal-300 mt-0.5">
-            {(nota.nota_item ?? []).length} item · {kodeList.join(', ') || 'Tidak ada kode'}
+    <div className="rounded-2xl border border-border bg-surface overflow-hidden">
+      <button
+        onClick={() => setBuka(!buka)}
+        className="w-full flex items-center justify-between px-4 py-4 active:opacity-70"
+      >
+        <div className="text-left">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-sans text-sm font-semibold text-navy-900">
+              {formatTanggal(nota.tanggal)}
+            </p>
+            <span className={`rounded-full px-2 py-0.5 font-sans text-xs font-bold uppercase ${badgeColor}`}>
+              {nota.status}
+            </span>
+          </div>
+          <p className="mt-0.5 font-sans text-xs text-charcoal-500">
+            {kodeList.join(', ') || '—'}
           </p>
         </div>
-        <div className="text-right">
-          <p className="font-sans text-label font-semibold text-navy-900">{formatRp(nota.total_nilai)}</p>
-          <span className="font-sans text-xs text-charcoal-300">{open ? '▲' : '▼'}</span>
-        </div>
+        <span className="font-sans text-xs text-charcoal-400">{buka ? '▲' : '▼'}</span>
       </button>
 
-      {open && (
-        <div className="border-t border-border divide-y divide-border">
-          {(nota.nota_item ?? []).map((item) => {
-            const nama = item.katalog_bahan_baku?.nama ?? item.nama_custom ?? '-'
-            const kodes = (item.nota_item_kode ?? []).map((x) => x.kode?.kode_desain).filter(Boolean)
-            return (
-              <div key={item.id} className="px-4 py-2.5">
-                <div className="flex justify-between items-start">
-                  <p className="font-sans text-label text-navy-900 font-semibold">{nama}</p>
-                  <p className="font-sans text-label text-navy-900">{formatRp(item.total_nilai)}</p>
-                </div>
-                <p className="font-sans text-xs text-charcoal-300">
-                  {item.tipe === 'unit'
-                    ? `${item.qty} × ${formatRp(item.harga_satuan)}`
-                    : 'Usage-based'
-                  } · {kodes.length ? kodes.join(', ') : 'Semua kode'}
-                </p>
+      {buka && (
+        <div className="border-t border-border px-4 pb-4 pt-3 space-y-3">
+          {/* Aksesoris */}
+          {(nota.aksesoris || []).length > 0 && (
+            <div>
+              <p className="mb-2 font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500">
+                AKSESORIS
+              </p>
+              <div className="space-y-1">
+                {nota.aksesoris.map((a, i) => (
+                  <div key={i} className="flex justify-between">
+                    <span className="font-sans text-xs text-charcoal-700">{a.nama}</span>
+                    <span className="font-sans text-xs font-semibold text-navy-900">
+                      {formatRp(a.harga_per_baju)}/baju
+                    </span>
+                  </div>
+                ))}
               </div>
-            )
-          })}
-          {nota.catatan && (
-            <p className="px-4 py-2 font-sans text-xs text-charcoal-600">{nota.catatan}</p>
+            </div>
+          )}
+
+          {/* Biaya produksi */}
+          <div>
+            <p className="mb-2 font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500">
+              BIAYA PRODUKSI
+            </p>
+            {bp.tampilkan_rincian ? (
+              <div className="space-y-1">
+                {[['Jahit', bp.jahit], ['Potong', bp.potong], ['Finishing', bp.finishing], ['ATK', bp.atk]].map(([label, val]) => (
+                  <div key={label} className="flex justify-between">
+                    <span className="font-sans text-xs text-charcoal-700">{label}</span>
+                    <span className="font-sans text-xs text-navy-900">{formatRp(val)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="font-sans text-xs text-charcoal-700">
+                Kisaran {formatRp(35000)} – {formatRp(45000)}/baju
+              </p>
+            )}
+          </div>
+
+          {/* Biaya jual beli */}
+          <div className="flex justify-between border-t border-border pt-3">
+            <span className="font-sans text-xs text-charcoal-600">Biaya Jual Beli</span>
+            <span className="font-sans text-xs font-semibold text-navy-900">
+              {formatRp(nota.biaya_jual_beli || 20000)}/baju
+            </span>
+          </div>
+
+          {/* Alasan tolak */}
+          {nota.alasan_tolak && (
+            <div className="rounded-xl bg-red-50 px-3 py-2">
+              <p className="font-sans text-xs font-semibold text-red-700">ALASAN DITOLAK</p>
+              <p className="font-sans text-xs text-red-600 mt-0.5">{nota.alasan_tolak}</p>
+            </div>
           )}
         </div>
       )}
@@ -122,225 +373,404 @@ function NotaCard({ nota }) {
   )
 }
 
-// ─── FormNota (bottom sheet) ──────────────────────────────────────────────────
-function FormNota({ katalog, semuaKode, onSubmit, onClose, isPending, error }) {
-  const today = new Date().toISOString().slice(0, 10)
-  const [tanggal, setTanggal] = useState(today)
-  const [catatan, setCatatan] = useState('')
-  const [items, setItems] = useState([newItem()])
+// ─── Form Buat Nota ───────────────────────────────────────────────────────────
 
-  function newItem() {
-    return { katalog_id: '', nama_custom: '', tipe: 'unit', qty: '', harga_satuan: '', total_nilai: '', kode_ids: [] }
+function FormBuatNota({ produksiList, onBatal, onSimpan, isSaving }) {
+  const [produksiId, setProduksiId] = useState('')
+  const [kodeIds, setKodeIds] = useState([])
+  const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10))
+  const [bahan, setBahan] = useState([])
+  const [aksesoris, setAksesoris] = useState(AKSESORIS_DEFAULT.map((a) => ({ ...a })))
+  const [biayaProduksi, setBiayaProduksi] = useState({ ...BIAYA_PRODUKSI_DEFAULT })
+  const [biayaJualBeli, setBiayaJualBeli] = useState(20000)
+
+  const produksiTerpilih = produksiList.find((p) => p.id === produksiId)
+
+  // Daftar warna dari bahan primer produksi
+  const warnaList = useMemo(() => {
+    if (!produksiTerpilih) return []
+    const semuaWarna = new Set()
+    ;(produksiTerpilih.produksi_bahan || [])
+      .filter((b) => b.tipe_bahan === 'primer')
+      .forEach((b) => {
+        ;(b.produksi_bahan_warna || []).forEach((w) => {
+          if (w.nama_warna) semuaWarna.add(w.nama_warna)
+        })
+      })
+    return [...semuaWarna]
+  }, [produksiTerpilih])
+
+  // Total pcs dari kode terpilih
+  const totalPcs = useMemo(() => {
+    if (!produksiTerpilih || !kodeIds.length) return 0
+    let total = 0
+    ;(produksiTerpilih.kode || [])
+      .filter((k) => kodeIds.includes(k.id))
+      .forEach((k) => {
+        ;(k.kode_ukuran || []).forEach((u) => {
+          ;(u.kode_ukuran_warna || []).forEach((w) => {
+            total += w.jumlah_pcs || 0
+          })
+        })
+      })
+    return total
+  }, [produksiTerpilih, kodeIds])
+
+  const kodeList = produksiTerpilih?.kode || []
+  const totalBP = totalBiayaProduksi(biayaProduksi)
+
+  function tambahBahan() {
+    setBahan([
+      ...bahan,
+      {
+        nama: '',
+        tipe_bahan: 'primer',
+        harga_per_satuan: 0,
+        pcs_baju: totalPcs,
+        pemakaian_warna: warnaList.map((n) => ({ nama: n, yard: 0 })),
+        total_pemakaian: 0,
+      },
+    ])
   }
 
-  function addItem() { setItems((p) => [...p, newItem()]) }
-  function removeItem(i) { setItems((p) => p.filter((_, x) => x !== i)) }
-  function updateItem(i, key, val) {
-    setItems((p) => p.map((item, x) => x === i ? { ...item, [key]: val } : item))
-  }
-  function toggleKode(i, kid) {
-    setItems((p) => p.map((item, x) => {
-      if (x !== i) return item
-      const ids = item.kode_ids.includes(kid)
-        ? item.kode_ids.filter((k) => k !== kid)
-        : [...item.kode_ids, kid]
-      return { ...item, kode_ids: ids }
-    }))
+  function ubahBahan(idx, val) {
+    const arr = [...bahan]
+    arr[idx] = val
+    setBahan(arr)
   }
 
-  function handleSubmit(e) {
-    e.preventDefault()
-    onSubmit({
+  function hapusBahan(idx) {
+    setBahan(bahan.filter((_, i) => i !== idx))
+  }
+
+  function tambahAksesoris() {
+    setAksesoris([...aksesoris, { nama: '', harga_per_baju: 0 }])
+  }
+
+  function ubahAksesoris(idx, val) {
+    const arr = [...aksesoris]
+    arr[idx] = val
+    setAksesoris(arr)
+  }
+
+  function hapusAksesoris(idx) {
+    setAksesoris(aksesoris.filter((_, i) => i !== idx))
+  }
+
+  function toggleKode(kodeId) {
+    setKodeIds((prev) =>
+      prev.includes(kodeId) ? prev.filter((id) => id !== kodeId) : [...prev, kodeId]
+    )
+  }
+
+  async function handleSimpan() {
+    if (!produksiId || !kodeIds.length) return
+    await onSimpan({
+      produksi_id: produksiId,
+      kode_ids: kodeIds,
       tanggal,
-      catatan: catatan || null,
-      items: items.map((item) => ({
-        katalog_id: item.katalog_id || null,
-        nama_custom: !item.katalog_id ? item.nama_custom : null,
-        tipe: item.tipe,
-        qty: item.tipe === 'unit' ? Number(item.qty) : null,
-        harga_satuan: item.tipe === 'unit' ? Number(item.harga_satuan) : null,
-        total_nilai: item.tipe === 'usage'
-          ? Number(item.total_nilai)
-          : Number(item.qty) * Number(item.harga_satuan),
-        kode_ids: item.kode_ids,
-      })),
+      bahan,
+      aksesoris,
+      biaya_produksi: biayaProduksi,
+      biaya_jual_beli: biayaJualBeli,
     })
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/60">
-      <div className="w-full rounded-t-2xl bg-surface max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 pt-6 pb-4 shrink-0">
-          <p className="font-heading text-heading text-navy-900">NOTA BARU</p>
-          <button onClick={onClose} className="font-sans text-label text-charcoal-600">BATAL</button>
+    <div className="space-y-6">
+      {/* Pilih produksi */}
+      <div>
+        <p className="mb-2 font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500">
+          PRODUKSI
+        </p>
+        <select
+          className="w-full rounded-xl border border-border bg-champagne-50 px-3 py-3 font-sans text-sm text-navy-900"
+          value={produksiId}
+          onChange={(e) => { setProduksiId(e.target.value); setKodeIds([]) }}
+        >
+          <option value="">— Pilih produksi —</option>
+          {produksiList.map((p) => (
+            <option key={p.id} value={p.id}>{p.kode_bahan} — {formatTanggal(p.tanggal)}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Pilih kode */}
+      {produksiTerpilih && (
+        <div>
+          <p className="mb-2 font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500">
+            KODE (PILIH SATU ATAU LEBIH)
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {kodeList.map((k) => (
+              <button
+                key={k.id}
+                onClick={() => toggleKode(k.id)}
+                className={[
+                  'rounded-xl border px-3 py-2 font-sans text-xs font-bold transition-colors',
+                  kodeIds.includes(k.id)
+                    ? 'border-navy-900 bg-navy-900 text-champagne-100'
+                    : 'border-border text-charcoal-600',
+                ].join(' ')}
+              >
+                {k.kode_desain}
+              </button>
+            ))}
+          </div>
+          {totalPcs > 0 && (
+            <p className="mt-2 font-sans text-xs text-charcoal-500">
+              Total {totalPcs.toLocaleString('id-ID')} pcs dari kode terpilih
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Tanggal */}
+      <div>
+        <p className="mb-2 font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500">
+          TANGGAL
+        </p>
+        <input
+          type="date"
+          className="w-full rounded-xl border border-border bg-champagne-50 px-3 py-3 font-sans text-sm text-navy-900"
+          value={tanggal}
+          onChange={(e) => setTanggal(e.target.value)}
+        />
+      </div>
+
+      {/* Bahan */}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500">
+            BAHAN
+          </p>
+          <button
+            onClick={tambahBahan}
+            className="rounded-xl border border-gold-500 px-3 py-1.5 font-sans text-xs font-bold text-gold-600 active:opacity-70"
+          >
+            + TAMBAH BAHAN
+          </button>
+        </div>
+        <div className="space-y-3">
+          {bahan.map((b, idx) => (
+            <ItemBahan
+              key={idx}
+              item={b}
+              warnaList={warnaList}
+              totalPcs={totalPcs}
+              onChange={(val) => ubahBahan(idx, val)}
+              onHapus={() => hapusBahan(idx)}
+            />
+          ))}
+          {bahan.length === 0 && (
+            <p className="py-4 text-center font-sans text-xs text-charcoal-400">
+              Belum ada bahan. Tekan + TAMBAH BAHAN.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Aksesoris */}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500">
+            AKSESORIS (PER BAJU)
+          </p>
+          <button
+            onClick={tambahAksesoris}
+            className="rounded-xl border border-gold-500 px-3 py-1.5 font-sans text-xs font-bold text-gold-600 active:opacity-70"
+          >
+            + TAMBAH
+          </button>
+        </div>
+        <div className="space-y-2">
+          {aksesoris.map((a, idx) => (
+            <ItemAksesoris
+              key={idx}
+              item={a}
+              onChange={(val) => ubahAksesoris(idx, val)}
+              onHapus={() => hapusAksesoris(idx)}
+            />
+          ))}
+        </div>
+        <div className="mt-2 flex justify-between rounded-xl bg-champagne-100 px-3 py-2">
+          <span className="font-sans text-xs text-charcoal-600">Total aksesoris</span>
+          <span className="font-sans text-xs font-semibold text-navy-900">
+            {formatRp(aksesoris.reduce((s, a) => s + (a.harga_per_baju || 0), 0))}/baju
+          </span>
+        </div>
+      </div>
+
+      {/* Biaya Produksi */}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500">
+            BIAYA PRODUKSI (PER BAJU)
+          </p>
+          <button
+            onClick={() => setBiayaProduksi((prev) => ({ ...prev, tampilkan_rincian: !prev.tampilkan_rincian }))}
+            className="font-sans text-xs font-semibold text-gold-600 active:opacity-70"
+          >
+            {biayaProduksi.tampilkan_rincian ? 'SEMBUNYIKAN RINCIAN' : 'TAMPILKAN RINCIAN'}
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto px-4 pb-8 space-y-5 flex-1">
-          {/* Tanggal & catatan */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-sans text-xs font-semibold text-charcoal-600 uppercase mb-1">Tanggal</label>
-              <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)}
-                className="w-full rounded-xl border border-border px-3 py-2.5 font-sans text-label text-navy-900 outline-none focus:border-gold-500" />
-            </div>
-            <div>
-              <label className="block font-sans text-xs font-semibold text-charcoal-600 uppercase mb-1">Catatan</label>
-              <input value={catatan} onChange={(e) => setCatatan(e.target.value.toUpperCase())}
-                placeholder="OPSIONAL" className="w-full rounded-xl border border-border px-3 py-2.5 font-sans text-label text-navy-900 uppercase outline-none focus:border-gold-500" />
-            </div>
-          </div>
-
-          {/* Items */}
-          <div className="space-y-4">
-            {items.map((item, i) => (
-              <NotaItemInput
-                key={i}
-                item={item}
-                idx={i}
-                katalog={katalog}
-                semuaKode={semuaKode}
-                onUpdate={(key, val) => updateItem(i, key, val)}
-                onToggleKode={(kid) => toggleKode(i, kid)}
-                onRemove={() => removeItem(i)}
-              />
-            ))}
-            <button type="button" onClick={addItem}
-              className="w-full rounded-xl border-2 border-dashed border-gold-500 py-3 font-sans text-label font-semibold text-gold-500">
-              + TAMBAH ITEM
-            </button>
-          </div>
-
-          {/* Total preview */}
-          <div className="rounded-xl bg-navy-900 px-4 py-3 flex justify-between">
-            <p className="font-sans text-label text-champagne-100">TOTAL</p>
-            <p className="font-sans text-label font-semibold text-gold-500">
-              {formatRp(items.reduce((s, item) => {
-                const v = item.tipe === 'unit'
-                  ? (Number(item.qty) || 0) * (Number(item.harga_satuan) || 0)
-                  : (Number(item.total_nilai) || 0)
-                return s + v
-              }, 0))}
+        {!biayaProduksi.tampilkan_rincian ? (
+          <div className="rounded-xl border border-border bg-champagne-50 px-4 py-3">
+            <p className="font-sans text-xs text-charcoal-500">
+              Kisaran {formatRp(35000)} – {formatRp(45000)}/baju
+            </p>
+            <p className="mt-1 font-sans text-xs font-semibold text-navy-900">
+              Total saat ini: {formatRp(totalBP)}/baju
             </p>
           </div>
+        ) : (
+          <div className="space-y-2">
+            {[
+              { key: 'jahit', label: 'UPAH JAHIT' },
+              { key: 'potong', label: 'UPAH POTONG' },
+              { key: 'finishing', label: 'FINISHING' },
+              { key: 'atk', label: 'ATK & LAIN-LAIN' },
+            ].map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-2">
+                <span className="w-32 font-sans text-xs text-charcoal-600">{label}</span>
+                <div className="flex flex-1 items-center gap-1 rounded-xl border border-border bg-champagne-50 px-3 py-2">
+                  <span className="font-sans text-xs text-charcoal-400">Rp</span>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full bg-transparent font-sans text-sm text-navy-900 outline-none"
+                    value={biayaProduksi[key] || ''}
+                    onChange={(e) => setBiayaProduksi((prev) => ({ ...prev, [key]: parseInt(e.target.value) || 0 }))}
+                  />
+                </div>
+              </div>
+            ))}
+            <div className="flex justify-between rounded-xl bg-champagne-100 px-3 py-2">
+              <span className="font-sans text-xs text-charcoal-600">Total biaya produksi</span>
+              <span className="font-sans text-xs font-semibold text-navy-900">{formatRp(totalBP)}/baju</span>
+            </div>
+          </div>
+        )}
+      </div>
 
-          {error && <p className="rounded-xl bg-danger/10 px-4 py-3 font-sans text-label text-danger">{error.message}</p>}
+      {/* Biaya Jual Beli */}
+      <div>
+        <p className="mb-2 font-sans text-xs font-semibold uppercase tracking-wide text-charcoal-500">
+          BIAYA JUAL BELI (PER BAJU)
+        </p>
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-champagne-50 px-3 py-3">
+          <span className="font-sans text-sm text-charcoal-400">Rp</span>
+          <input
+            type="number"
+            min="0"
+            className="flex-1 bg-transparent font-sans text-sm text-navy-900 outline-none"
+            value={biayaJualBeli || ''}
+            onChange={(e) => setBiayaJualBeli(parseInt(e.target.value) || 0)}
+          />
+        </div>
+      </div>
 
-          <button type="submit" disabled={isPending || items.length === 0}
-            className="w-full rounded-xl bg-gold-500 py-4 font-sans text-body font-semibold text-navy-900 disabled:opacity-50">
-            {isPending ? 'MENYIMPAN...' : 'SIMPAN NOTA'}
-          </button>
-        </form>
+      {/* Tombol */}
+      <div className="flex gap-3 pt-2">
+        <button
+          onClick={onBatal}
+          className="flex-1 rounded-2xl border-2 border-border py-4 font-sans text-label font-bold tracking-wide text-charcoal-600 active:opacity-70"
+        >
+          BATAL
+        </button>
+        <button
+          onClick={handleSimpan}
+          disabled={isSaving || !produksiId || !kodeIds.length}
+          className="flex-1 rounded-2xl bg-navy-900 py-4 font-sans text-label font-bold tracking-wide text-champagne-100 disabled:opacity-40 active:opacity-80"
+        >
+          {isSaving ? 'MENYIMPAN...' : 'SIMPAN'}
+        </button>
       </div>
     </div>
   )
 }
 
-function NotaItemInput({ item, idx, katalog, semuaKode, onUpdate, onToggleKode, onRemove }) {
-  const [showKode, setShowKode] = useState(false)
-  const namaKatalog = katalog.find((k) => k.id === item.katalog_id)?.nama ?? ''
+// ─── Halaman Utama ────────────────────────────────────────────────────────────
+
+export function NotaListPage() {
+  const navigate = useNavigate()
+  const profile = useAuthStore(selectProfile)
+  const { data: produksiList = [], isLoading: loadingProduksi } = useDaftarProduksi()
+  const [produksiFilterId, setProduksiFilterId] = useState('')
+  const { data: notaList = [], isLoading: loadingNota } = useNotaByProduksi(produksiFilterId)
+  const buatNotaMut = useBuatNota()
+  const [showForm, setShowForm] = useState(false)
+
+  async function handleSimpan(payload) {
+    await buatNotaMut.mutateAsync({ ...payload, created_by: profile?.id })
+    setShowForm(false)
+  }
 
   return (
-    <div className="rounded-xl bg-champagne-100 border border-border overflow-hidden">
-      <div className="bg-champagne-200 px-4 py-2.5 flex items-center justify-between">
-        <p className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Item {idx + 1}</p>
-        <button type="button" onClick={onRemove} className="font-sans text-xs text-danger">HAPUS</button>
+    <div className="min-h-screen bg-champagne-100">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-champagne-100 px-4 pb-3 pt-12">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-sans text-xs font-semibold uppercase tracking-widest text-gold-500">
+              NOTA BIAYA
+            </p>
+            <h1 className="font-heading text-heading text-navy-900">NOTA</h1>
+          </div>
+          {!showForm && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="rounded-2xl bg-navy-900 px-4 py-2.5 font-sans text-xs font-bold tracking-wide text-champagne-100 active:opacity-80"
+            >
+              + BUAT NOTA
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="px-4 py-3 space-y-3">
-        {/* Nama bahan */}
-        <div>
-          <label className="block font-sans text-xs font-semibold text-charcoal-600 uppercase mb-1">Nama Bahan</label>
-          <select
-            value={item.katalog_id}
-            onChange={(e) => onUpdate('katalog_id', e.target.value)}
-            className="w-full rounded-xl border border-border px-3 py-2.5 font-sans text-label text-navy-900 bg-surface outline-none focus:border-gold-500"
-          >
-            <option value="">— Input manual —</option>
-            {katalog.map((k) => (
-              <option key={k.id} value={k.id}>{k.nama} ({k.tipe})</option>
-            ))}
-          </select>
-          {!item.katalog_id && (
-            <input
-              value={item.nama_custom}
-              onChange={(e) => onUpdate('nama_custom', e.target.value.toUpperCase())}
-              placeholder="NAMA BAHAN BAKU"
-              className="mt-2 w-full rounded-xl border border-border px-3 py-2.5 font-sans text-label text-navy-900 uppercase outline-none focus:border-gold-500"
-            />
-          )}
-        </div>
-
-        {/* Tipe */}
-        <div className="flex gap-2">
-          {TIPE_ITEM.map(({ v, l }) => (
-            <button key={v} type="button" onClick={() => onUpdate('tipe', v)}
-              className={[
-                'flex-1 rounded-xl border py-2 font-sans text-xs font-semibold',
-                item.tipe === v ? 'border-gold-500 bg-gold-500/10 text-navy-900' : 'border-border text-charcoal-600',
-              ].join(' ')}>
-              {l}
-            </button>
-          ))}
-        </div>
-
-        {/* Nilai */}
-        {item.tipe === 'unit' ? (
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block font-sans text-xs text-charcoal-600 mb-1">Qty</label>
-              <input type="number" min={0} value={item.qty} onChange={(e) => onUpdate('qty', e.target.value)}
-                placeholder="0" className="w-full rounded-lg border border-border px-3 py-2 font-sans text-label text-navy-900 outline-none focus:border-gold-500" />
-            </div>
-            <div>
-              <label className="block font-sans text-xs text-charcoal-600 mb-1">Harga/satuan</label>
-              <input type="number" min={0} value={item.harga_satuan} onChange={(e) => onUpdate('harga_satuan', e.target.value)}
-                placeholder="0" className="w-full rounded-lg border border-border px-3 py-2 font-sans text-label text-navy-900 outline-none focus:border-gold-500" />
-            </div>
-          </div>
+      <div className="px-4 pb-24 space-y-4">
+        {showForm ? (
+          <FormBuatNota
+            produksiList={produksiList}
+            onBatal={() => setShowForm(false)}
+            onSimpan={handleSimpan}
+            isSaving={buatNotaMut.isPending}
+          />
         ) : (
-          <div>
-            <label className="block font-sans text-xs text-charcoal-600 mb-1">Total Nilai</label>
-            <input type="number" min={0} value={item.total_nilai} onChange={(e) => onUpdate('total_nilai', e.target.value)}
-              placeholder="0" className="w-full rounded-lg border border-border px-3 py-2 font-sans text-label text-navy-900 outline-none focus:border-gold-500" />
-          </div>
-        )}
+          <>
+            {/* Filter produksi */}
+            <select
+              className="w-full rounded-xl border border-border bg-surface px-3 py-3 font-sans text-sm text-navy-900"
+              value={produksiFilterId}
+              onChange={(e) => setProduksiFilterId(e.target.value)}
+            >
+              <option value="">— Pilih produksi untuk lihat nota —</option>
+              {produksiList.map((p) => (
+                <option key={p.id} value={p.id}>{p.kode_bahan} — {formatTanggal(p.tanggal)}</option>
+              ))}
+            </select>
 
-        {/* Alokasi kode */}
-        <div>
-          <button type="button" onClick={() => setShowKode((v) => !v)}
-            className="w-full flex justify-between items-center font-sans text-xs font-semibold text-charcoal-600 uppercase">
-            <span>Untuk kode ({item.kode_ids.length} dipilih)</span>
-            <span>{showKode ? '▲' : '▼'}</span>
-          </button>
-          {showKode && (
-            <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
-              {semuaKode.length === 0
-                ? <p className="font-sans text-xs text-charcoal-300">Belum ada kode aktif.</p>
-                : semuaKode.map((k) => (
-                  <button key={k.id} type="button" onClick={() => onToggleKode(k.id)}
-                    className={[
-                      'w-full text-left rounded-lg px-3 py-2 font-sans text-xs',
-                      item.kode_ids.includes(k.id)
-                        ? 'bg-gold-500/20 text-navy-900 font-semibold'
-                        : 'bg-surface text-charcoal-600',
-                    ].join(' ')}>
-                    {k.kode_desain}
-                  </button>
-                ))
-              }
-            </div>
-          )}
-        </div>
-
-        {/* Preview subtotal */}
-        {(item.tipe === 'unit' && item.qty && item.harga_satuan) || (item.tipe === 'usage' && item.total_nilai) ? (
-          <p className="text-right font-sans text-label font-semibold text-navy-900">
-            = {formatRp(item.tipe === 'unit'
-              ? Number(item.qty) * Number(item.harga_satuan)
-              : Number(item.total_nilai)
+            {/* List nota */}
+            {loadingNota ? (
+              <p className="py-8 text-center font-sans text-sm text-charcoal-400">MEMUAT...</p>
+            ) : !produksiFilterId ? (
+              <p className="py-8 text-center font-sans text-sm text-charcoal-400">
+                Pilih produksi untuk melihat nota.
+              </p>
+            ) : notaList.length === 0 ? (
+              <p className="py-8 text-center font-sans text-sm text-charcoal-400">
+                Belum ada nota untuk produksi ini.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {notaList.map((nota) => (
+                  <NotaCard key={nota.id} nota={nota} />
+                ))}
+              </div>
             )}
-          </p>
-        ) : null}
+          </>
+        )}
       </div>
     </div>
   )

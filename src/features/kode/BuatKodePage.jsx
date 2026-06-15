@@ -51,7 +51,7 @@ export function BuatKodePage() {
 
   const nomor = watch('nomor')
   const kodeBahan = watch('kode_bahan')?.toUpperCase()
-  const preview = nomor && kodeBahan ? `J-${nomor}-${kodeBahan}` : '—'
+  const preview = nomor && kodeBahan ? `J-${nomor}-${kodeBahan}` : '\u2014'
 
   async function onSubmit(values) {
     const kode_desain = `J-${values.nomor}-${values.kode_bahan.toUpperCase()}`
@@ -74,7 +74,7 @@ export function BuatKodePage() {
           onClick={() => navigate(-1)}
           className="font-sans text-sm text-champagne-100 opacity-70 active:opacity-100"
         >
-          ← KEMBALI
+          &#8592; KEMBALI
         </button>
         <h1 className="font-heading text-heading text-champagne-100">KODE BARU</h1>
       </div>
@@ -162,34 +162,6 @@ export function BuatKodePage() {
           />
           {errors.ukuran && (
             <p className="mt-1.5 font-sans text-xs text-danger">{errors.ukuran.message}</p>
-          )}
-        </div>
-
-        {/* Harga jual target (opsional) */}
-        <div>
-          <label className="block font-sans text-label font-semibold text-charcoal-600 uppercase mb-1.5">
-            Harga Jual Target{' '}
-            <span className="font-normal text-charcoal-300 normal-case">(opsional)</span>
-          </label>
-          <div className="flex items-center gap-2">
-            <span className="font-sans text-body text-charcoal-600">Rp</span>
-            <Controller
-              name="harga_jual_target"
-              control={control}
-              render={({ field }) => (
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="0"
-                  value={field.value ?? ''}
-                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                  className="flex-1 rounded-xl border border-border bg-surface px-4 py-3 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
-                />
-              )}
-            />
-          </div>
-          {errors.harga_jual_target && (
-            <p className="mt-1 font-sans text-xs text-danger">{errors.harga_jual_target.message}</p>
           )}
         </div>
 
