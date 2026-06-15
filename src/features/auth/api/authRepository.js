@@ -76,6 +76,13 @@ export async function undangPengguna({ email, nama_lengkap, role }) {
   if (error) throw error
 }
 
+export async function hapusUser(userId) {
+  const { error } = await supabase.functions.invoke('hapus-pengguna', {
+    body: { userId },
+  })
+  if (error) throw error
+}
+
 /**
  * Daftarkan listener perubahan auth state (login/logout/refresh token).
  * @param {(session: import('@supabase/supabase-js').Session | null) => void} callback

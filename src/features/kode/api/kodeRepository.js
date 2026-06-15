@@ -169,6 +169,26 @@ export async function updateStatusKode(kodeId, perubahan) {
 }
 
 /**
+ * Sync status ke semua kode dalam produksi yang sama (yang masih di dariStatus).
+ * Dipakai untuk tahap bersama: proses_potong, input_buku_potong, input_nota.
+ */
+async function syncStatusSeProduksi(kodeId, dariStatus, keStatus) {
+  const { data: kode, error: e1 } = await supabase
+    .from('kode')
+    .select('produksi_id')
+    .eq('id', kodeId)
+    .single()
+  if (e1) throw e1
+
+  const { error: e2 } = await supabase
+    .from('kode')
+    .update({ status: keStatus })
+    .eq('produksi_id', kode.produksi_id)
+    .eq('status', dariStatus)
+  if (e2) throw e2
+}
+
+/**
  * Tambah warna ke kode_ukuran (biasanya setelah input buku potong).
  */
 export async function tambahWarnaKode({ kode_ukuran_id, nama_warna, jumlah_pcs }) {
@@ -428,13 +448,17 @@ export async function buatSampelDanAjukanReview({
 // ESTIMASI, KONFIRMASI, PROSES POTONG (transisi status flow)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Konfirmasi estimasi → lanjut ke konfirmasi_pemakaian. */
+/** Konfirmasi estimasi → proses_potong (sync semua kode di produksi yg sama). */
 export async function konfirmasiEstimasi(kodeId) {
+  await syncStatusSeProduksi(kodeId, 'estimasi_pemakaian', 'proses_potong')
+  await syncStatusSeProduksi(kodeId, 'konfirmasi_pemakaian', 'proses_potong')
   return updateStatusKode(kodeId, { status: 'proses_potong' })
 }
 
-/** Lanjutkan dari konfirmasi_pemakaian → proses_potong. */
+/** Lanjutkan dari konfirmasi_pemakaian → proses_potong (sync semua kode). */
 export async function lanjutkanKeProsesPotong(kodeId) {
+  await syncStatusSeProduksi(kodeId, 'konfirmasi_pemakaian', 'proses_potong')
+  await syncStatusSeProduksi(kodeId, 'estimasi_pemakaian', 'proses_potong')
   return updateStatusKode(kodeId, { status: 'proses_potong' })
 }
 
@@ -454,17 +478,24 @@ export async function lanjutkanDariBatalkan(kodeId, statusSebelumDibatalkan) {
   })
 }
 
-/** Mulai proses potong → tandai input_buku_potong. */
+/** Mulai proses potong → input_buku_potong (sync semua kode). */
 export async function mulaiInputBukuPotong(kodeId) {
+  await syncStatusSeProduksi(kodeId, 'proses_potong', 'input_buku_potong')
   return updateStatusKode(kodeId, { status: 'input_buku_potong' })
 }
 
-/** Selesai buku potong → lanjut ke input_nota (untuk buat Nota Biaya). */
+/** Selesai buku potong → input_nota (sync semua kode). */
 export async function lanjutKeInputNota(kodeId) {
+  await syncStatusSeProduksi(kodeId, 'input_buku_potong', 'input_nota')
   return updateStatusKode(kodeId, { status: 'input_nota' })
 }
 
 /** Skip sampel → langsung ke proses_potong. */
 export async function lanjutTanpaSampel(kodeId) {
   return updateStatusKode(kodeId, { status: 'proses_potong' })
+}
+
+/** Recovery: kode stuck di input_nota padahal nota sudah approved → langsung ke produksi. */
+export async function lanjutKeProduksiSetelahNota(kodeId) {
+  return updateStatusKode(kodeId, { status: 'produksi' })
 }

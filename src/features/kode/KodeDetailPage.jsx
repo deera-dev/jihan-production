@@ -15,6 +15,7 @@ import {
   useLanjutkanDariBatalkan,
   useMulaiInputBukuPotong,
   useLanjutKeInputNota,
+  useLanjutKeProduksiSetelahNota,
   useLanjutTanpaSampel,
 } from "./hooks/useKode";
 import {
@@ -205,6 +206,7 @@ export function KodeDetailPage() {
   const lanjutDariBatalkanMut = useLanjutkanDariBatalkan(kodeId);
   const mulaiInputBPMut = useMulaiInputBukuPotong(kodeId);
   const lanjutKeNotaMut = useLanjutKeInputNota(kodeId);
+  const lanjutKeProduksiMut = useLanjutKeProduksiSetelahNota(kodeId);
   const lanjutTanpaSampelMut = useLanjutTanpaSampel(kodeId);
   const updatePcsDoneMut = useUpdatePcsDone(kodeId);
   const catatRejectMut = useCatatReject(kodeId);
@@ -238,6 +240,12 @@ export function KodeDetailPage() {
     notaList.find((n) => ["review", "approved"].includes(n.status)) ??
     notaList[0] ??
     null;
+  // Nota yang secara eksplisit mencakup kode ini
+  const notaUntukKodeIni = notaList.find(
+    (n) => n.nota_kode?.some((nk) => nk.kode_id === kodeId)
+  );
+  const notaApprovedUntukKodeIni =
+    notaUntukKodeIni?.status === "approved" ? notaUntukKodeIni : null;
 
   const ctaHandlers = {
     lanjutTanpaSampel: () => lanjutTanpaSampelMut.mutate(),
@@ -248,16 +256,27 @@ export function KodeDetailPage() {
         onSuccess: () =>
           navigate("/produksi/" + kode.produksi_id + "/buku-potong"),
       }),
-    lanjutKeNota: () =>
-      lanjutKeNotaMut.mutate(null, { onSuccess: () => navigate("/nota") }),
+    lanjutKeNota: notaApprovedUntukKodeIni
+      ? () => navigate("/nota")
+      : () => lanjutKeNotaMut.mutate(null, { onSuccess: () => navigate("/nota") }),
     inputHpp: () => navigate("/nota"),
   };
   const ctaPending =
     lanjutTanpaSampelMut.isPending ||
     lanjutDariBatalkanMut.isPending ||
     mulaiInputBPMut.isPending ||
-    lanjutKeNotaMut.isPending;
-  const cta = isDeera ? getCtaInfo(status, ctaHandlers) : null;
+    lanjutKeNotaMut.isPending ||
+    lanjutKeProduksiMut.isPending;
+  const ctaBase = isDeera ? getCtaInfo(status, ctaHandlers) : null;
+  // Recovery: kode stuck di input_nota tapi nota sudah ada → override CTA
+  const cta =
+    status === "input_nota" && notaApprovedUntukKodeIni && ctaBase
+      ? {
+          label: "LANJUT KE PRODUKSI",
+          desc: "Nota sudah ada — tandai kode siap produksi",
+          onClick: () => lanjutKeProduksiMut.mutate(),
+        }
+      : ctaBase;
 
   return (
     <div className="bg-champagne-100">
@@ -805,14 +824,7 @@ function TabProduksi({ kode, isDeera, onUpdatePcs, onCatatReject }) {
 
   return (
     <div className="space-y-4">
-      {!aktif && (
-        <div className="rounded-xl bg-champagne-200 px-4 py-3">
-          <p className="font-sans text-xs font-semibold text-navy-900 mb-0.5">BELUM AKTIF</p>
-          <p className="font-sans text-xs text-charcoal-600">
-            Tab ini aktif setelah Nota Biaya disetujui Jihan.
-          </p>
-        </div>
-      )}
+
 
       {/* Progress bar keseluruhan */}
       {aktif && ukuranList.length > 0 && (

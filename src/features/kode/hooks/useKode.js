@@ -21,6 +21,7 @@ import {
   lanjutkanDariBatalkan,
   mulaiInputBukuPotong,
   lanjutKeInputNota,
+  lanjutKeProduksiSetelahNota,
   lanjutTanpaSampel,
 } from '../api/kodeRepository'
 
@@ -219,6 +220,17 @@ export function useLanjutTanpaSampel(kodeId) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => lanjutTanpaSampel(kodeId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['kode', kodeId] })
+      qc.invalidateQueries({ queryKey: ['produksi'] })
+    },
+  })
+}
+
+export function useLanjutKeProduksiSetelahNota(kodeId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => lanjutKeProduksiSetelahNota(kodeId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kode', kodeId] })
       qc.invalidateQueries({ queryKey: ['produksi'] })

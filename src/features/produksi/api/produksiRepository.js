@@ -30,7 +30,8 @@ export async function ambilSemuaProduksi() {
           ukuran,
           kode_ukuran_warna (
             nama_warna,
-            jumlah_pcs
+            jumlah_pcs,
+            tracking_produksi (tahap, pcs_done)
           )
         )
       )

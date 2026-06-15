@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
-import { ambilSemuaUser, undangPengguna } from '../auth'
+import { ambilSemuaUser, undangPengguna, hapusUser } from '../auth'
 
 const undangSchema = z.object({
   email: z.string().min(1, 'Email wajib diisi').email('Format email tidak valid'),
@@ -26,6 +26,7 @@ export function KelolaPenggunaPage() {
   const queryClient = useQueryClient()
   const [formTerbuka, setFormTerbuka] = useState(false)
   const [sukses, setSukses] = useState(false)
+  const [hapusTarget, setHapusTarget] = useState(null) // { id, nama_lengkap }
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
@@ -44,6 +45,14 @@ export function KelolaPenggunaPage() {
       reset()
       setSukses(true)
       setFormTerbuka(false)
+    },
+  })
+
+  const { mutate: jalankanHapus, isPending: isHapusPending } = useMutation({
+    mutationFn: (userId) => hapusUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      setHapusTarget(null)
     },
   })
 
@@ -138,19 +147,51 @@ export function KelolaPenggunaPage() {
           <div className="space-y-3">
             {users.map((u) => (
               <div key={u.id} className="rounded-xl bg-surface border border-border px-4 py-4">
-                <p className="font-sans text-body font-semibold text-navy-900">
-                  {u.nama_lengkap ?? '(Belum diisi)'}
-                </p>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="rounded-full bg-champagne-200 px-2.5 py-0.5 font-sans text-xs font-semibold text-charcoal-600 uppercase">
-                    {LABEL_ROLE[u.role] ?? u.role}
-                  </span>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-sans text-body font-semibold text-navy-900">
+                      {u.nama_lengkap ?? '(Belum diisi)'}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="rounded-full bg-champagne-200 px-2.5 py-0.5 font-sans text-xs font-semibold text-charcoal-600 uppercase">
+                        {LABEL_ROLE[u.role] ?? u.role}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setHapusTarget(u)}
+                    className="font-sans text-xs font-semibold text-danger"
+                  >
+                    HAPUS
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+
+        {/* Modal Konfirmasi Hapus */}
+          {hapusTarget && (
+            <div className="fixed inset-0 z-[60] flex items-end bg-black/60">
+              <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
+                <p className="font-heading text-heading text-navy-900">HAPUS PENGGUNA</p>
+                <p className="font-sans text-body text-charcoal-600">
+                  Hapus akun <span className="font-semibold text-navy-900">{hapusTarget.nama_lengkap}</span>? Pengguna tidak bisa login lagi setelah dihapus.
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={() => setHapusTarget(null)}
+                    className="flex-1 rounded-xl border border-border py-3.5 font-sans text-body font-semibold text-charcoal-600">
+                    BATAL
+                  </button>
+                  <button onClick={() => jalankanHapus(hapusTarget.id)} disabled={isHapusPending}
+                    className="flex-1 rounded-xl bg-danger py-3.5 font-sans text-body font-semibold text-white disabled:opacity-50">
+                    {isHapusPending ? 'MENGHAPUS...' : 'HAPUS'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
     </div>
   )
 }

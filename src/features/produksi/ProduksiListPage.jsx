@@ -102,20 +102,37 @@ export function ProduksiListPage() {
   )
 }
 
+const TAHAP_PRODUKSI = ['dijahit', 'finishing', 'siap_kirim']
+
 function hitungInfoKode(kode) {
   const ukuranList = kode.kode_ukuran ?? []
   let totalPcs = 0
   const warnaSet = new Set()
+  let totalUnit = 0
+  let doneUnit = 0
   ukuranList.forEach((u) => {
     (u.kode_ukuran_warna ?? []).forEach((w) => {
-      totalPcs += w.jumlah_pcs || 0
+      const pcs = w.jumlah_pcs || 0
+      totalPcs += pcs
       if (w.nama_warna) warnaSet.add(w.nama_warna)
+      if (pcs > 0) {
+        totalUnit += pcs * TAHAP_PRODUKSI.length
+        ;(w.tracking_produksi ?? []).forEach((t) => {
+          if (TAHAP_PRODUKSI.includes(t.tahap)) {
+            doneUnit += Math.min(t.pcs_done ?? 0, pcs)
+          }
+        })
+      }
     })
   })
+  const pct = totalUnit > 0 ? Math.round((doneUnit / totalUnit) * 100) : 0
+  const adaTracking = ['produksi', 'siap_kirim', 'selesai'].includes(kode.status)
   return {
     totalPcs,
     warnaList: [...warnaSet],
     ukuranList: ukuranList.map((u) => u.ukuran).filter(Boolean),
+    pct,
+    adaTracking,
   }
 }
 
@@ -161,7 +178,7 @@ function ProduksiCard({ produksi, onClick }) {
                   <StatusBadge status={k.status} />
                 </div>
                 {info.totalPcs > 0 && (
-                  <div className="space-y-0.5">
+                  <div className="space-y-1">
                     <p className="font-sans text-xs text-charcoal-300">
                       {info.totalPcs} pcs
                       {info.ukuranList.length > 0 && ` · ${info.ukuranList.join(', ')}`}
@@ -170,6 +187,19 @@ function ProduksiCard({ produksi, onClick }) {
                       <p className="font-sans text-xs text-charcoal-300">
                         {info.warnaList.join(' · ')}
                       </p>
+                    )}
+                    {info.adaTracking && (
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <div className="flex-1 h-1.5 rounded-full bg-champagne-200 overflow-hidden">
+                          <div
+                            className="h-1.5 rounded-full bg-navy-900 transition-all"
+                            style={{ width: info.pct + '%' }}
+                          />
+                        </div>
+                        <span className="font-sans text-[10px] font-bold text-navy-900 w-8 text-right">
+                          {info.pct}%
+                        </span>
+                      </div>
                     )}
                   </div>
                 )}

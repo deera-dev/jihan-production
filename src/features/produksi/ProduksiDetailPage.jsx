@@ -6,6 +6,7 @@ import {
   useDetailProduksi,
   useUpdateProduksi,
   useHapusProduksi,
+  useTambahBahan,
   useUpdateBahan,
   useHapusBahan,
   useTambahWarnaBahan,
@@ -72,16 +73,24 @@ export function ProduksiDetailPage() {
 
   const [modalEdit, setModalEdit] = useState(false)
   const [modalHapus, setModalHapus] = useState(false)
-  const [editForm, setEditForm] = useState({ kode_bahan: '', catatan: '' })
+  const [showFormBahan, setShowFormBahan] = useState(false)
+  const [editForm, setEditForm] = useState({ kode_bahan: '', tanggal: '', catatan: '' })
+  const tambahBahanMut = useTambahBahan(produksiId)
+  const tambahWarnaMut = useTambahWarnaBahan(produksiId)
 
   function bukaEdit() {
-    setEditForm({ kode_bahan: produksi?.kode_bahan ?? '', catatan: produksi?.catatan ?? '' })
+    setEditForm({
+      kode_bahan: produksi?.kode_bahan ?? '',
+      tanggal: produksi?.tanggal ?? new Date().toISOString().slice(0, 10),
+      catatan: produksi?.catatan ?? '',
+    })
     setModalEdit(true)
   }
 
   async function simpanEdit() {
     await updateMut.mutateAsync({ id: produksiId, perubahan: {
       kode_bahan: editForm.kode_bahan.toUpperCase(),
+      tanggal: editForm.tanggal,
       catatan: editForm.catatan || null,
     }})
     setModalEdit(false)
@@ -127,6 +136,12 @@ export function ProduksiDetailPage() {
         </div>
         {isDeera && (
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setModalHapus(true)}
+              className="rounded-lg border border-danger/60 px-3 py-1.5 font-sans text-xs font-semibold text-danger"
+            >
+              HAPUS
+            </button>
             <button
               onClick={bukaEdit}
               className="rounded-lg border border-champagne-100/40 px-3 py-1.5 font-sans text-xs font-semibold text-champagne-100"
@@ -199,13 +214,25 @@ export function ProduksiDetailPage() {
           </section>
         )}
 
-        {/* Bahan Primer */}
-        {bahanPrimer.length > 0 && (
-          <section>
-            <p className="mb-3 font-sans text-label font-semibold text-charcoal-300 uppercase tracking-widest">
-              BAHAN PRIMER (MOTIF)
+        {/* Bahan Dari Jihan */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <p className="font-sans text-label font-semibold text-charcoal-300 uppercase tracking-widest">
+              BAHAN DARI JIHAN
             </p>
-            <div className="space-y-3">
+            {isDeera && (
+              <button
+                onClick={() => setShowFormBahan(true)}
+                className="font-sans text-xs font-semibold text-gold-500"
+              >
+                + TAMBAH BAHAN
+              </button>
+            )}
+          </div>
+
+          {bahanPrimer.length > 0 && (
+            <div className="space-y-3 mb-3">
+              <p className="font-sans text-xs font-semibold text-charcoal-300 uppercase tracking-wide">Primer (Motif)</p>
               {bahanPrimer.map((b) => (
                 <BahanPrimerCard
                   key={b.id}
@@ -215,26 +242,21 @@ export function ProduksiDetailPage() {
                 />
               ))}
             </div>
-          </section>
-        )}
+          )}
 
-        {/* Bahan Sekunder */}
-        {bahanSekunder.length > 0 && (
-          <section>
-            <p className="mb-3 font-sans text-label font-semibold text-charcoal-300 uppercase tracking-widest">
-              BAHAN SEKUNDER
-            </p>
+          {bahanSekunder.length > 0 && (
             <div className="space-y-3">
-              {bahanSekunder.map((b) => <BahanCard key={b.id} bahan={b} />)}
+              <p className="font-sans text-xs font-semibold text-charcoal-300 uppercase tracking-wide">Sekunder</p>
+              {bahanSekunder.map((b) => <BahanCard key={b.id} bahan={b} isDeera={isDeera} produksiId={produksiId} />)}
             </div>
-          </section>
-        )}
+          )}
 
-        {bahanPrimer.length === 0 && bahanSekunder.length === 0 && (
-          <div className="rounded-xl bg-surface border border-border px-4 py-5 text-center">
-            <p className="font-sans text-body text-charcoal-300">Belum ada data bahan.</p>
-          </div>
-        )}
+          {bahanPrimer.length === 0 && bahanSekunder.length === 0 && (
+            <div className="rounded-xl bg-surface border border-border px-4 py-5 text-center">
+              <p className="font-sans text-body text-charcoal-300">Belum ada data bahan.</p>
+            </div>
+          )}
+        </section>
 
         {produksi.catatan && (
           <section>
@@ -272,6 +294,15 @@ export function ProduksiDetailPage() {
               />
             </div>
             <div className="space-y-1">
+              <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Tanggal Mulai</label>
+              <input
+                type="date"
+                value={editForm.tanggal}
+                onChange={(e) => setEditForm((p) => ({ ...p, tanggal: e.target.value }))}
+                className="w-full rounded-xl border border-border px-4 py-3 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
+              />
+            </div>
+            <div className="space-y-1">
               <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Catatan (opsional)</label>
               <textarea
                 rows={3}
@@ -292,6 +323,17 @@ export function ProduksiDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Tambah Bahan */}
+      {showFormBahan && (
+        <FormTambahBahan
+          produksiId={produksiId}
+          bahanCount={(produksi.produksi_bahan ?? []).length}
+          tambahBahanMut={tambahBahanMut}
+          tambahWarnaMut={tambahWarnaMut}
+          onTutup={() => setShowFormBahan(false)}
+        />
       )}
 
       {/* Modal Hapus Produksi */}
@@ -315,6 +357,198 @@ export function ProduksiDetailPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Form Tambah Bahan ────────────────────────────────────────────────────────
+
+function FormTambahBahan({ produksiId, bahanCount, tambahBahanMut, tambahWarnaMut, onTutup }) {
+  const [form, setForm] = useState({
+    jenis_bahan: '',
+    tipe_bahan: 'primer',
+    satuan: 'yard',
+    harga_per_satuan: '',
+    jumlah_dibeli: '',
+  })
+  const [warna, setWarna] = useState([{ nama_warna: '', yard_tersedia: '' }])
+  const [error, setError] = useState('')
+  const isPrimer = form.tipe_bahan === 'primer'
+
+  const satuanLabel = form.satuan === 'yard' ? 'YARD' : 'PANEL'
+
+  function updateWarna(idx, field, val) {
+    setWarna((prev) => prev.map((w, i) => i === idx ? { ...w, [field]: val } : w))
+  }
+  function tambahWarna() {
+    setWarna((prev) => [...prev, { nama_warna: '', yard_tersedia: '' }])
+  }
+  function hapusWarna(idx) {
+    setWarna((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  async function handleSimpan() {
+    setError('')
+    if (!form.jenis_bahan.trim()) return setError('Jenis bahan wajib diisi.')
+    if (!form.harga_per_satuan) return setError('Harga wajib diisi.')
+    if (isPrimer && warna.some((w) => !w.nama_warna.trim())) return setError('Nama warna wajib diisi.')
+
+    try {
+      const bahan = await tambahBahanMut.mutateAsync({
+        produksi_id: produksiId,
+        jenis_bahan: form.jenis_bahan.toUpperCase(),
+        tipe_bahan: form.tipe_bahan,
+        satuan: form.satuan,
+        harga_per_satuan: parseFloat(form.harga_per_satuan) || 0,
+        jumlah_dibeli: !isPrimer && form.jumlah_dibeli ? parseFloat(form.jumlah_dibeli) : null,
+        urutan: bahanCount + 1,
+      })
+      if (isPrimer) {
+        for (const [i, w] of warna.entries()) {
+          await tambahWarnaMut.mutateAsync({
+            produksi_bahan_id: bahan.id,
+            nama_warna: w.nama_warna.toUpperCase(),
+            yard_tersedia: parseFloat(w.yard_tersedia) || 0,
+            urutan: i + 1,
+          })
+        }
+      }
+      onTutup()
+    } catch (e) {
+      setError(e.message || 'Gagal menyimpan.')
+    }
+  }
+
+  const isSaving = tambahBahanMut.isPending || tambahWarnaMut.isPending
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end bg-black/60" onClick={(e) => { if (e.target === e.currentTarget) onTutup() }}>
+      <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-5 max-h-[90vh] overflow-y-auto">
+        <p className="font-heading text-heading text-navy-900">TAMBAH BAHAN</p>
+
+        {/* Jenis Bahan */}
+        <div className="space-y-1">
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Jenis Bahan</label>
+          <input
+            type="text"
+            placeholder="MOTIF IMA, POLOS, PURING..."
+            value={form.jenis_bahan}
+            onChange={(e) => setForm((p) => ({ ...p, jenis_bahan: e.target.value.toUpperCase() }))}
+            className="w-full rounded-xl border border-border px-4 py-3 font-sans text-body text-navy-900 uppercase outline-none focus:border-gold-500"
+          />
+        </div>
+
+        {/* Tipe Bahan */}
+        <div className="space-y-2">
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Tipe Bahan</label>
+          <div className="flex gap-3">
+            {[{ v: 'primer', l: 'PRIMER (MOTIF)' }, { v: 'sekunder', l: 'SEKUNDER (POLOS/PURING)' }].map(({ v, l }) => (
+              <button
+                key={v}
+                onClick={() => setForm((p) => ({ ...p, tipe_bahan: v }))}
+                className={[
+                  'flex-1 rounded-xl border py-3 font-sans text-xs font-semibold flex items-center gap-2 px-3',
+                  form.tipe_bahan === v ? 'border-gold-500 text-navy-900' : 'border-border text-charcoal-300',
+                ].join(' ')}
+              >
+                <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${form.tipe_bahan === v ? 'border-gold-500 bg-gold-500' : 'border-charcoal-300'}`} />
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Satuan */}
+        <div className="space-y-2">
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Satuan</label>
+          <div className="flex gap-3">
+            {[{ v: 'yard', l: 'YARD' }, { v: 'panel', l: 'PANEL' }].map(({ v, l }) => (
+              <button
+                key={v}
+                onClick={() => setForm((p) => ({ ...p, satuan: v }))}
+                className={[
+                  'flex-1 rounded-xl border py-3 font-sans text-xs font-semibold flex items-center gap-2 px-3',
+                  form.satuan === v ? 'border-gold-500 text-navy-900' : 'border-border text-charcoal-300',
+                ].join(' ')}
+              >
+                <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${form.satuan === v ? 'border-gold-500 bg-gold-500' : 'border-charcoal-300'}`} />
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Harga */}
+        <div className="space-y-1">
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Harga per {satuanLabel} (Rp)</label>
+          <input
+            type="number"
+            inputMode="numeric"
+            placeholder="0"
+            value={form.harga_per_satuan}
+            onChange={(e) => setForm((p) => ({ ...p, harga_per_satuan: e.target.value }))}
+            className="w-full rounded-xl border border-border px-4 py-3 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
+          />
+        </div>
+
+        {/* Jumlah Diterima (sekunder only) */}
+        {!isPrimer && (
+          <div className="space-y-1">
+            <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Jumlah Diterima ({satuanLabel}) — opsional</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              placeholder="0"
+              value={form.jumlah_dibeli}
+              onChange={(e) => setForm((p) => ({ ...p, jumlah_dibeli: e.target.value }))}
+              className="w-full rounded-xl border border-border px-4 py-3 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
+            />
+          </div>
+        )}
+
+        {/* Warna (primer only) */}
+        {isPrimer && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Warna Bahan</label>
+              <button onClick={tambahWarna} className="font-sans text-xs font-semibold text-gold-500">+ WARNA</button>
+            </div>
+            {warna.map((w, idx) => (
+              <div key={idx} className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  placeholder="NAMA WARNA"
+                  value={w.nama_warna}
+                  onChange={(e) => updateWarna(idx, 'nama_warna', e.target.value.toUpperCase())}
+                  className="flex-1 rounded-xl border border-border px-3 py-2.5 font-sans text-sm text-navy-900 uppercase outline-none focus:border-gold-500"
+                />
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="YARD"
+                  value={w.yard_tersedia}
+                  onChange={(e) => updateWarna(idx, 'yard_tersedia', e.target.value)}
+                  className="w-20 rounded-xl border border-border px-3 py-2.5 font-sans text-sm text-navy-900 outline-none focus:border-gold-500"
+                />
+                {warna.length > 1 && (
+                  <button onClick={() => hapusWarna(idx)} className="text-danger font-sans text-xs font-bold px-1">✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {error && <p className="font-sans text-xs text-danger">{error}</p>}
+
+        <div className="flex gap-3 pt-2">
+          <button onClick={onTutup} className="flex-1 rounded-xl border border-border py-3.5 font-sans text-body font-semibold text-charcoal-600">
+            BATAL
+          </button>
+          <button onClick={handleSimpan} disabled={isSaving} className="flex-1 rounded-xl bg-gold-500 py-3.5 font-sans text-body font-semibold text-navy-900 disabled:opacity-50">
+            {isSaving ? 'MENYIMPAN...' : 'SIMPAN'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -419,100 +653,95 @@ function BahanPrimerCard({ bahan, isDeera, produksiId }) {
   if (mode === 'edit') {
     return (
       <div className="rounded-xl bg-surface border border-gold-500 px-4 py-4 space-y-4">
+        {/* Edit bahan */}
         <div className="space-y-1">
           <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Jenis Bahan</label>
           <input
             type="text"
             value={editBahan.jenis_bahan}
             onChange={(e) => setEditBahan((p) => ({ ...p, jenis_bahan: e.target.value.toUpperCase() }))}
-            className="w-full rounded-xl border border-border px-3 py-2.5 font-sans text-body text-navy-900 uppercase outline-none focus:border-gold-500"
+            className="w-full rounded-xl border border-border px-4 py-3 font-sans text-body text-navy-900 uppercase outline-none focus:border-gold-500"
           />
         </div>
         <div className="space-y-1">
-          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Harga / Yard (Rp)</label>
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Harga per {bahan.satuan?.toUpperCase() || 'YARD'} (Rp)</label>
           <input
             type="number"
             value={editBahan.harga_per_satuan}
             onChange={(e) => setEditBahan((p) => ({ ...p, harga_per_satuan: e.target.value }))}
-            className="w-full rounded-xl border border-border px-3 py-2.5 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
+            className="w-full rounded-xl border border-border px-4 py-3 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
           />
         </div>
+
+        {/* Edit warna */}
         <div className="space-y-2">
           <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Warna</label>
           {editWarna.filter((w) => !w._del).map((w, idx) => {
             const realIdx = editWarna.indexOf(w)
             return (
-              <div key={idx} className="flex items-center gap-1.5">
+              <div key={idx} className="flex gap-2 items-center">
                 <input
                   type="text"
                   value={w.nama_warna}
                   onChange={(e) =>
                     setEditWarna((prev) =>
-                      prev.map((x, i) => (i === realIdx ? { ...x, nama_warna: e.target.value.toUpperCase() } : x))
+                      prev.map((x, i) => i === realIdx ? { ...x, nama_warna: e.target.value.toUpperCase() } : x)
                     )
                   }
-                  placeholder="NAMA WARNA"
-                  className="flex-1 min-w-0 rounded-xl border border-border px-3 py-2 font-sans text-label text-navy-900 uppercase outline-none focus:border-gold-500"
+                  className="flex-1 rounded-xl border border-border px-3 py-2 font-sans text-sm text-navy-900 uppercase outline-none focus:border-gold-500"
                 />
                 <input
                   type="number"
                   value={w.yard_tersedia}
                   onChange={(e) =>
                     setEditWarna((prev) =>
-                      prev.map((x, i) => (i === realIdx ? { ...x, yard_tersedia: e.target.value } : x))
+                      prev.map((x, i) => i === realIdx ? { ...x, yard_tersedia: e.target.value } : x)
                     )
                   }
-                  placeholder="yd"
-                  className="w-14 rounded-xl border border-border px-2 py-2 font-sans text-label text-navy-900 outline-none focus:border-gold-500 text-center"
+                  className="w-20 rounded-xl border border-border px-3 py-2 font-sans text-sm text-navy-900 outline-none focus:border-gold-500"
+                  placeholder="yard"
                 />
-                <button
-                  onClick={() => hapusWarnaLokal(realIdx)}
-                  className="shrink-0 w-6 font-sans text-sm font-semibold text-danger leading-none"
-                >
-                  ×
-                </button>
+                <button onClick={() => hapusWarnaLokal(realIdx)} className="text-danger font-sans text-xs font-bold px-1">✕</button>
               </div>
             )
           })}
-          <div className="flex items-center gap-1.5 pt-1">
+          {/* Tambah warna baru */}
+          <div className="flex gap-2 items-center pt-1">
             <input
               type="text"
+              placeholder="WARNA BARU"
               value={warnaInput.nama_warna}
               onChange={(e) => setWarnaInput((p) => ({ ...p, nama_warna: e.target.value.toUpperCase() }))}
-              placeholder="WARNA BARU"
-              className="flex-1 min-w-0 rounded-xl border border-border bg-champagne-100 px-3 py-2 font-sans text-label text-navy-900 uppercase outline-none focus:border-gold-500"
+              className="flex-1 rounded-xl border border-dashed border-gold-500 px-3 py-2 font-sans text-sm text-navy-900 uppercase outline-none"
             />
             <input
               type="number"
+              placeholder="yard"
               value={warnaInput.yard_tersedia}
               onChange={(e) => setWarnaInput((p) => ({ ...p, yard_tersedia: e.target.value }))}
-              placeholder="yd"
-              className="w-14 rounded-xl border border-border bg-champagne-100 px-2 py-2 font-sans text-label text-navy-900 outline-none focus:border-gold-500 text-center"
+              className="w-20 rounded-xl border border-dashed border-gold-500 px-3 py-2 font-sans text-sm text-navy-900 outline-none"
             />
-            <button
-              onClick={tambahWarnaLokal}
-              className="shrink-0 rounded-lg bg-champagne-200 px-2.5 py-2 font-sans text-xs font-semibold text-navy-900"
-            >
-              +
-            </button>
+            <button onClick={tambahWarnaLokal} className="font-sans text-xs font-bold text-gold-500 px-1">+</button>
           </div>
         </div>
-        <div className="flex gap-2 pt-1">
+
+        <div className="flex gap-2">
           <button
             onClick={() => setModalHapusBahan(true)}
-            className="rounded-xl border border-danger px-4 py-2.5 font-sans text-label font-semibold text-danger"
+            className="rounded-xl border border-danger px-3 py-2 font-sans text-xs font-semibold text-danger"
           >
             HAPUS
           </button>
           <button onClick={tutupEdit}
-            className="flex-1 rounded-xl border border-border py-2.5 font-sans text-label font-semibold text-charcoal-600">
+            className="flex-1 rounded-xl border border-border py-2.5 font-sans text-sm font-semibold text-charcoal-600">
             BATAL
           </button>
           <button onClick={simpanEdit} disabled={isSaving}
-            className="flex-1 rounded-xl bg-gold-500 py-2.5 font-sans text-label font-semibold text-navy-900 disabled:opacity-50">
-            {isSaving ? 'MENYIMPAN...' : 'SIMPAN'}
+            className="flex-1 rounded-xl bg-gold-500 py-2.5 font-sans text-sm font-semibold text-navy-900 disabled:opacity-50">
+            {isSaving ? 'SIMPAN...' : 'SIMPAN'}
           </button>
         </div>
+
         {modalHapusBahan && (
           <div className="fixed inset-0 z-[70] flex items-end bg-black/60">
             <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
@@ -537,24 +766,22 @@ function BahanPrimerCard({ bahan, isDeera, produksiId }) {
     )
   }
 
+  // mode === 'view'
   return (
     <div className="rounded-xl bg-surface border border-border px-4 py-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div>
           <p className="font-sans text-body font-semibold text-navy-900">{bahan.jenis_bahan}</p>
           <p className="mt-0.5 font-sans text-label text-charcoal-600">
-            {formatRp(bahan.harga_per_satuan)} / yard
+            {formatRp(bahan.harga_per_satuan)} / {bahan.satuan}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="rounded-full bg-champagne-200 px-2.5 py-0.5 font-sans text-xs text-charcoal-600">YARD</span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-champagne-200 px-2.5 py-0.5 font-sans text-xs text-charcoal-600">
+            {bahan.satuan?.toUpperCase()}
+          </span>
           {isDeera && (
-            <button
-              onClick={bukaEdit}
-              className="rounded-lg border border-border px-2.5 py-1 font-sans text-xs font-semibold text-charcoal-600"
-            >
-              EDIT
-            </button>
+            <button onClick={bukaEdit} className="font-sans text-xs font-semibold text-gold-500">EDIT</button>
           )}
         </div>
       </div>
@@ -580,39 +807,168 @@ function BahanPrimerCard({ bahan, isDeera, produksiId }) {
   )
 }
 
-function BahanCard({ bahan }) {
-  const warna = [...(bahan.produksi_bahan_warna ?? [])].sort((a, b) => a.urutan - b.urutan)
-  const totalYard = warna.reduce((s, w) => s + (w.yard_tersedia ?? 0), 0)
+function BahanCard({ bahan, isDeera, produksiId }) {
+  const updateBahanMut = useUpdateBahan(produksiId)
+  const hapusBahanMut = useHapusBahan(produksiId)
+  const [mode, setMode] = useState('view')
+  const [modalHapus, setModalHapus] = useState(false)
+  const [form, setForm] = useState({
+    jenis_bahan: '',
+    harga_per_satuan: '',
+    jumlah_dibeli: '',
+    meter: '',      // input meter dari user
+    per_baju: '1', // per berapa baju
+  })
+
+  // 1 meter = 1.09361 yard
+  const METER_TO_YARD = 1.09361
+  const yardPerPcs = (() => {
+    const m = parseFloat(form.meter) || 0
+    const n = parseFloat(form.per_baju) || 1
+    return m > 0 ? ((m / n) * METER_TO_YARD).toFixed(3) : ''
+  })()
+
+  function bukaEdit() {
+    // Konversi simpanan yard/pcs kembali ke meter (approx) untuk tampilan
+    const existingYard = bahan.konsumsi_per_pcs ?? 0
+    setForm({
+      jenis_bahan: bahan.jenis_bahan ?? '',
+      harga_per_satuan: bahan.harga_per_satuan ?? '',
+      jumlah_dibeli: bahan.jumlah_dibeli ?? '',
+      meter: existingYard > 0 ? (existingYard / METER_TO_YARD).toFixed(2) : '',
+      per_baju: '1',
+    })
+    setMode('edit')
+  }
+
+  async function simpan() {
+    const konsumsi = parseFloat(yardPerPcs) || 0
+    await updateBahanMut.mutateAsync({
+      id: bahan.id,
+      perubahan: {
+        jenis_bahan: form.jenis_bahan.toUpperCase(),
+        harga_per_satuan: parseFloat(form.harga_per_satuan) || 0,
+        konsumsi_per_pcs: konsumsi,
+        jumlah_dibeli: form.jumlah_dibeli ? parseFloat(form.jumlah_dibeli) : null,
+      },
+    })
+    setMode('view')
+  }
+
+  async function konfirmasiHapus() {
+    await hapusBahanMut.mutateAsync(bahan.id)
+    setModalHapus(false)
+  }
+
+  const satuanLabel = bahan.satuan === 'panel' ? 'panel' : 'yard'
+
+  if (mode === 'edit') {
+    return (
+      <div className="rounded-xl bg-surface border border-gold-500 px-4 py-4 space-y-4">
+        <div className="space-y-1">
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Jenis Bahan</label>
+          <input type="text" value={form.jenis_bahan}
+            onChange={(e) => setForm((p) => ({ ...p, jenis_bahan: e.target.value.toUpperCase() }))}
+            className="w-full rounded-xl border border-border px-4 py-3 font-sans text-body text-navy-900 uppercase outline-none focus:border-gold-500"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Pemakaian per Baju</label>
+          <div className="flex items-center gap-2">
+            <input type="number" inputMode="decimal" placeholder="0.00" value={form.meter}
+              onChange={(e) => setForm((p) => ({ ...p, meter: e.target.value }))}
+              className="flex-1 rounded-xl border border-border px-3 py-3 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
+            />
+            <span className="font-sans text-xs text-charcoal-300 flex-shrink-0">m /</span>
+            <input type="number" inputMode="numeric" placeholder="1" value={form.per_baju}
+              onChange={(e) => setForm((p) => ({ ...p, per_baju: e.target.value }))}
+              className="w-16 rounded-xl border border-border px-3 py-3 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
+            />
+            <span className="font-sans text-xs text-charcoal-300 flex-shrink-0">baju</span>
+          </div>
+          {yardPerPcs && (
+            <p className="font-sans text-xs text-gold-500 font-semibold">
+              = {yardPerPcs} yard/pcs
+            </p>
+          )}
+        </div>
+        <div className="space-y-1">
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Harga per {satuanLabel} (Rp)</label>
+          <input type="number" inputMode="numeric" placeholder="0" value={form.harga_per_satuan}
+            onChange={(e) => setForm((p) => ({ ...p, harga_per_satuan: e.target.value }))}
+            className="w-full rounded-xl border border-border px-4 py-3 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="font-sans text-xs font-semibold text-charcoal-600 uppercase">Jumlah Diterima ({satuanLabel}) — opsional</label>
+          <input type="number" inputMode="decimal" placeholder="0" value={form.jumlah_dibeli}
+            onChange={(e) => setForm((p) => ({ ...p, jumlah_dibeli: e.target.value }))}
+            className="w-full rounded-xl border border-border px-4 py-3 font-sans text-body text-navy-900 outline-none focus:border-gold-500"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setModalHapus(true)}
+            className="rounded-xl border border-danger px-3 py-2 font-sans text-xs font-semibold text-danger">
+            HAPUS
+          </button>
+          <button onClick={() => setMode('view')}
+            className="flex-1 rounded-xl border border-border py-2.5 font-sans text-sm font-semibold text-charcoal-600">
+            BATAL
+          </button>
+          <button onClick={simpan} disabled={updateBahanMut.isPending}
+            className="flex-1 rounded-xl bg-gold-500 py-2.5 font-sans text-sm font-semibold text-navy-900 disabled:opacity-50">
+            {updateBahanMut.isPending ? 'SIMPAN...' : 'SIMPAN'}
+          </button>
+        </div>
+
+        {modalHapus && (
+          <div className="fixed inset-0 z-[70] flex items-end bg-black/60">
+            <div className="w-full rounded-t-2xl bg-surface px-4 pt-6 pb-8 space-y-4">
+              <p className="font-heading text-heading text-navy-900">HAPUS BAHAN</p>
+              <p className="font-sans text-body text-charcoal-600">
+                Hapus bahan <span className="font-semibold text-navy-900">{bahan.jenis_bahan}</span>?
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setModalHapus(false)}
+                  className="flex-1 rounded-xl border border-border py-3.5 font-sans text-body font-semibold text-charcoal-600">
+                  BATAL
+                </button>
+                <button onClick={konfirmasiHapus} disabled={hapusBahanMut.isPending}
+                  className="flex-1 rounded-xl bg-danger py-3.5 font-sans text-body font-semibold text-white disabled:opacity-50">
+                  {hapusBahanMut.isPending ? 'MENGHAPUS...' : 'HAPUS'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // view mode
   return (
     <div className="rounded-xl bg-surface border border-border px-4 py-3">
       <div className="flex items-start justify-between gap-2">
-        <p className="font-sans text-body font-semibold text-navy-900">{bahan.jenis_bahan}</p>
-        <span className="rounded-full bg-champagne-200 px-2.5 py-0.5 font-sans text-xs text-charcoal-600">
-          {bahan.satuan?.toUpperCase()}
-        </span>
-      </div>
-      <p className="mt-0.5 font-sans text-label text-charcoal-600">
-        {formatRp(bahan.harga_per_satuan)} / {bahan.satuan}
-        {bahan.jumlah_dibeli ? ' · ' + bahan.jumlah_dibeli + ' ' + bahan.satuan + ' diterima' : ''}
-      </p>
-      {warna.length > 0 && (
-        <div className="mt-3 border-t border-border pt-3 space-y-1.5">
-          {warna.map((w) => (
-            <div key={w.id} className="flex items-center justify-between gap-2">
-              <span className="font-sans text-label text-navy-900">{w.nama_warna}</span>
-              <span className="font-sans text-label text-charcoal-600">
-                {w.yard_tersedia ? w.yard_tersedia + ' yard' : '—'}
-              </span>
-            </div>
-          ))}
-          {warna.length > 1 && (
-            <div className="flex items-center justify-between gap-2 border-t border-border pt-1.5">
-              <span className="font-sans text-label font-semibold text-charcoal-300">TOTAL</span>
-              <span className="font-sans text-label font-semibold text-navy-900">{totalYard} yard</span>
-            </div>
+        <div>
+          <p className="font-sans text-body font-semibold text-navy-900">{bahan.jenis_bahan}</p>
+          <p className="mt-0.5 font-sans text-label text-charcoal-600">
+            {bahan.konsumsi_per_pcs ? bahan.konsumsi_per_pcs + ' ' + satuanLabel + '/pcs' : '0 ' + satuanLabel + '/pcs'}
+            {' · '}
+            {formatRp(bahan.harga_per_satuan)}/{satuanLabel}
+          </p>
+          {bahan.jumlah_dibeli > 0 && (
+            <p className="font-sans text-xs text-charcoal-300">{bahan.jumlah_dibeli} {satuanLabel} diterima</p>
           )}
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-champagne-200 px-2.5 py-0.5 font-sans text-xs text-charcoal-600">
+            {bahan.satuan?.toUpperCase()}
+          </span>
+          {isDeera && (
+            <button onClick={bukaEdit} className="font-sans text-xs font-semibold text-gold-500">EDIT</button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

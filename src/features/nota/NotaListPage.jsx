@@ -1546,8 +1546,10 @@ export function NotaListPage() {
                     key={nota.id}
                     nota={nota}
                     isDeera={isDeera}
-                    isMaster={isMaster}
-                    onEdit={handleEdit}
+                                       onEdit={(nota) => {
+                      setEditingNota(nota);
+                      setShowForm(true);
+                    }}
                     onHapus={handleHapus}
                   />
                 ))}

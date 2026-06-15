@@ -20,7 +20,7 @@ export async function ambilNotaByProduksi(produksiId) {
           kode_ukuran (
             kode_ukuran_warna (jumlah_pcs)
           ),
-          sampel (foto_url, foto_url_2, status)
+          sampel (foto_depan_url, foto_belakang_url, status)
         )
       ),
       produksi:produksi_id (
@@ -81,12 +81,12 @@ export async function buatNota({
     if (errKode) throw errKode
 
     // Advance kode ke produksi — tidak perlu review Jihan
-    // DB trigger akan auto-buat tracking_produksi saat status -> 'produksi'
+    // Include semua status sebelum produksi agar kode yang mungkin terlambat sync ikut maju
     const { error: errStatus } = await supabase
       .from('kode')
       .update({ status: 'produksi' })
       .in('id', kode_ids)
-      .in('status', ['input_nota', 'input_hpp', 'hpp_ditolak', 'review_hpp'])
+      .in('status', ['proses_potong', 'input_buku_potong', 'input_nota', 'input_hpp', 'hpp_ditolak', 'review_hpp'])
     if (errStatus) throw errStatus
   }
 

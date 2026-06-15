@@ -1,9 +1,6 @@
-// Edge Function: undang-pengguna
-// Dipanggil dari frontend (Deera) untuk mengundang user baru.
-// Membutuhkan SUPABASE_SERVICE_ROLE_KEY sebagai environment variable
-// (set lewat Supabase Dashboard → Project Settings → Edge Functions).
-//
-// Deploy: supabase functions deploy undang-pengguna
+// Edge Function: hapus-pengguna
+// Dipanggil dari frontend (Master) untuk menghapus akun pengguna.
+// Deploy: supabase functions deploy hapus-pengguna
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -13,13 +10,11 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
-  // Pre-flight CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Validasi: hanya boleh diakses oleh user yang sudah login (JWT valid)
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Tidak terautentikasi' }), {
@@ -28,14 +23,13 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Client dengan anon key untuk cek role pemanggil
+    // Verifikasi pemanggil adalah Master
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } },
     )
 
-    // Pastikan pemanggil adalah Master
     const { data: { user: caller }, error: callerErr } = await supabaseClient.auth.getUser()
     if (callerErr || !caller) {
       return new Response(JSON.stringify({ error: 'Sesi tidak valid' }), {
@@ -43,49 +37,43 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
     const { data: profil, error: errProfil } = await supabaseClient
       .from('users')
       .select('role')
       .eq('id', caller.id)
       .single()
     if (errProfil || profil?.role !== 'master') {
-      return new Response(JSON.stringify({ error: 'Hanya Master yang bisa mengundang pengguna' }), {
+      return new Response(JSON.stringify({ error: 'Hanya Master yang bisa menghapus pengguna' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Baca body
-    const { email, nama_lengkap, role } = await req.json()
-
-    if (!email || !role || !['deera', 'jihan'].includes(role)) {
-      return new Response(JSON.stringify({ error: 'Email dan role wajib diisi (deera / jihan)' }), {
+    const { userId } = await req.json()
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'userId wajib diisi' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Client dengan service role key untuk admin.inviteUserByEmail
+    // Jangan izinkan hapus diri sendiri
+    if (userId === caller.id) {
+      return new Response(JSON.stringify({ error: 'Tidak bisa menghapus akun sendiri' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Hapus dari auth.users (akan cascade ke public.users via trigger/FK)
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
-    const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: { role, nama_lengkap: (nama_lengkap ?? '').toUpperCase() },
-    })
-
-    if (error) {
-      const pesan = error.message.includes('already been registered')
-        ? 'Email ini sudah terdaftar. Gunakan email lain.'
-        : error.message.toLowerCase().includes('email rate limit') || error.message.toLowerCase().includes('rate limit')
-          ? 'Batas pengiriman email tercapai. Tunggu sekitar 1 jam lalu coba lagi.'
-          : error.message
-      return new Response(JSON.stringify({ error: pesan }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+    if (error) throw error
 
     return new Response(JSON.stringify({ sukses: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
